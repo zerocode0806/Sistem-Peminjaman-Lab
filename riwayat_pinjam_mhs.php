@@ -478,7 +478,7 @@ tbody td:last-child { text-align: right; }
         <div class="logo-icon"><i class="bi bi-boxes"></i></div>
         <div class="sidebar-logo-text">
             <strong>LabSystem</strong>
-            <span>Admin Panel</span>
+            <span>Mahasiswa</span>
         </div>
     </div>
 
@@ -516,10 +516,10 @@ tbody td:last-child { text-align: right; }
     </ul>
 
     <div class="sidebar-user">
-        <div class="avatar"><?= strtoupper(substr($_SESSION['user']['nama'], 0, 1)) ?></div>
+        <div class="avatar"><?= strtoupper(substr($_SESSION['mahasiswa']['nama'], 0, 1)) ?></div>
         <div class="sidebar-user-info">
-            <strong><?= htmlspecialchars($_SESSION['user']['nama']) ?></strong>
-            <span>Administrator</span>
+            <strong><?= htmlspecialchars($_SESSION['mahasiswa']['nama']) ?></strong>
+            <span>Mahasiswa</span>
         </div>
     </div>
 </aside>
@@ -560,7 +560,7 @@ tbody td:last-child { text-align: right; }
                         <th>Tanggal</th>
                         <th>Waktu</th>
                         <th>Status</th>
-                        <th>Aksi</th>
+                        <!-- <th>Aksi</th> -->
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -593,11 +593,11 @@ tbody td:last-child { text-align: right; }
                                 <?= ucfirst($row['status']) ?>
                             </span>
                         </td>
-                        <td>
+                        <!-- <td>
                             <a href="checkout_pinjam.php?id=<?= $row['id_data'] ?>" class="btn-detail">
                                 <i class="bi bi-arrow-right"></i> Detail
                             </a>
-                        </td>
+                        </td> -->
                     </tr>
                     <?php endwhile; ?>
                 <?php endif; ?>
