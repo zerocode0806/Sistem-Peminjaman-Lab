@@ -532,6 +532,11 @@ tbody td:last-child { text-align: right; }
             </a>
         </li>
         <li class="nav-item">
+            <a class="nav-link" href="data_barang.php">
+                <i class="bi bi-box-seam-fill"></i> Data Barang
+            </a>
+        </li>
+        <li class="nav-item">
             <a class="nav-link" href="data_mhs.php">
                 <i class="bi bi-people-fill"></i> Mahasiswa
             </a>

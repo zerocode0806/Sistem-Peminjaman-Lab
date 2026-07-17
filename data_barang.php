@@ -6,14 +6,45 @@ if (!isset($_SESSION['user'])) {
   exit;
 }
 
-$query = mysqli_query($koneksi, "SELECT * FROM data_lab ORDER BY nama_lab ASC");
+// Filter opsional berdasarkan lab (misal datang dari tombol di data_lab.php)
+$filterLab = isset($_GET['id_lab']) && $_GET['id_lab'] !== '' ? $_GET['id_lab'] : null;
+
+if ($filterLab !== null) {
+    $stmt = mysqli_prepare($koneksi,
+        "SELECT b.*, l.nama_lab
+         FROM data_barang b
+         JOIN data_lab l ON b.id_lab = l.id_lab
+         WHERE b.id_lab = ?
+         ORDER BY b.nama_barang ASC");
+    mysqli_stmt_bind_param($stmt, "s", $filterLab);
+    mysqli_stmt_execute($stmt);
+    $query = mysqli_stmt_get_result($stmt);
+} else {
+    $query = mysqli_query($koneksi,
+        "SELECT b.*, l.nama_lab
+         FROM data_barang b
+         JOIN data_lab l ON b.id_lab = l.id_lab
+         ORDER BY b.nama_barang ASC");
+}
+
+// Untuk dropdown filter lab
+$daftarLab = mysqli_query($koneksi, "SELECT id_lab, nama_lab FROM data_lab ORDER BY nama_lab ASC");
+
+$activeLabName = null;
+if ($filterLab !== null) {
+    $stmtL = mysqli_prepare($koneksi, "SELECT nama_lab FROM data_lab WHERE id_lab = ?");
+    mysqli_stmt_bind_param($stmtL, "s", $filterLab);
+    mysqli_stmt_execute($stmtL);
+    $r = mysqli_stmt_get_result($stmtL)->fetch_assoc();
+    $activeLabName = $r['nama_lab'] ?? null;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Data Laboratorium – LabSystem</title>
+<title>Data Barang – LabSystem</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,6 +69,8 @@ $query = mysqli_query($koneksi, "SELECT * FROM data_lab ORDER BY nama_lab ASC");
     --blue-soft:  #EFF6FF;
     --amber:      #F59E0B;
     --amber-soft: #FFFBEB;
+    --violet:     #7C3AED;
+    --violet-soft:#F5F3FF;
     --sidebar-w:  228px;
     --radius:     10px;
 }
@@ -205,7 +238,7 @@ body {
     align-items: flex-end;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
     flex-wrap: wrap;
 }
 
@@ -218,11 +251,31 @@ body {
 
 .page-header-left p { font-size: 13px; color: var(--muted); }
 
-/* ── SEARCH ── */
-.search-wrap {
-    position: relative;
-    width: 220px;
+/* Active filter chip */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--violet-soft);
+    color: var(--violet);
+    border-radius: 100px;
+    font-size: 12.5px;
+    font-weight: 500;
+    margin-bottom: 18px;
 }
+.filter-chip a { color: var(--violet); display: inline-flex; align-items: center; margin-left: 2px; }
+
+/* ── TOOLBAR ── */
+.toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+
+.search-wrap { position: relative; width: 220px; }
 
 .search-wrap i {
     position: absolute;
@@ -249,6 +302,20 @@ body {
 
 .search-input:focus { border-color: var(--accent); }
 .search-input::placeholder { color: var(--muted); }
+
+.filter-select {
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+}
+
+.spacer { flex: 1; }
 
 /* ── BUTTONS ── */
 .btn-primary {
@@ -311,11 +378,7 @@ body {
 
 /* ── TABLE ── */
 .table-wrap { overflow-x: auto; }
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
+table { width: 100%; border-collapse: collapse; }
 
 thead th {
     padding: 11px 20px;
@@ -329,11 +392,7 @@ thead th {
     white-space: nowrap;
 }
 
-tbody tr {
-    border-bottom: 1px solid var(--border);
-    transition: background .12s;
-}
-
+tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: #FAFAF8; }
 
@@ -344,28 +403,11 @@ tbody td {
     vertical-align: middle;
 }
 
-/* Row number */
-.row-num {
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    color: var(--muted);
-    width: 48px;
-}
+.row-num { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); width: 48px; }
 
-/* Lab name cell */
-.lab-cell { display: flex; flex-direction: column; gap: 3px; }
-
-.lab-name {
-    font-weight: 600;
-    font-size: 13.5px;
-    color: var(--text);
-}
-
-.lab-meta {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
+.item-cell { display: flex; flex-direction: column; gap: 3px; }
+.item-name { font-weight: 600; font-size: 13.5px; color: var(--text); }
+.item-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 .meta-tag {
     display: inline-flex;
@@ -382,7 +424,34 @@ tbody td {
 
 .meta-tag i { font-size: 10px; }
 
-/* Status badge */
+.tag-kategori {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: var(--violet-soft);
+    color: var(--violet);
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.lab-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+    color: var(--text);
+    text-decoration: none;
+    padding: 4px 9px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    transition: border-color .15s, color .15s;
+}
+.lab-link:hover { border-color: var(--accent); color: var(--accent); }
+.lab-link i { font-size: 11px; color: var(--muted); }
+
+/* Status / kondisi badge */
 .badge {
     display: inline-flex;
     align-items: center;
@@ -394,48 +463,36 @@ tbody td {
     white-space: nowrap;
 }
 
-.badge::before {
-    content: '';
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
+.badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
 
-.badge-available {
-    background: var(--green-soft);
-    color: var(--green);
-}
+.badge-available { background: var(--green-soft); color: var(--green); }
 .badge-available::before { background: var(--green); }
 
-.badge-unavailable {
-    background: var(--red-soft);
-    color: var(--red);
-}
+.badge-unavailable { background: var(--red-soft); color: var(--red); }
 .badge-unavailable::before { background: var(--red); }
 
+.badge-baik { background: var(--green-soft); color: var(--green); }
+.badge-baik::before { background: var(--green); }
+
+.badge-rusak { background: var(--red-soft); color: var(--red); }
+.badge-rusak::before { background: var(--red); }
+
+.badge-perbaikan { background: var(--amber-soft); color: var(--amber); }
+.badge-perbaikan::before { background: var(--amber); }
+
 /* Stok indicator */
-.stok-bar-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+.stok-bar-wrap { display: flex; align-items: center; gap: 8px; }
 
 .stok-bar {
     flex: 1;
-    max-width: 80px;
+    max-width: 70px;
     height: 5px;
     background: var(--border);
     border-radius: 100px;
     overflow: hidden;
 }
 
-.stok-bar-fill {
-    height: 100%;
-    border-radius: 100px;
-    background: var(--green);
-    transition: width .3s;
-}
-
+.stok-bar-fill { height: 100%; border-radius: 100px; background: var(--green); transition: width .3s; }
 .stok-bar-fill.low { background: #F59E0B; }
 .stok-bar-fill.empty { background: var(--red); }
 
@@ -448,11 +505,7 @@ tbody td {
 }
 
 /* ── ACTION BUTTONS ── */
-.action-buttons {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
+.action-buttons { display: flex; align-items: center; gap: 6px; }
 
 .btn-action {
     width: 30px; height: 30px;
@@ -468,30 +521,11 @@ tbody td {
     transition: background .15s, color .15s, border-color .15s;
 }
 
-.btn-action.btn-edit:hover {
-    background: var(--blue-soft);
-    color: var(--blue);
-    border-color: var(--blue);
-}
-
-.btn-action.btn-inventaris:hover {
-    background: var(--amber-soft);
-    color: var(--amber);
-    border-color: var(--amber);
-}
-
-.btn-action.btn-delete:hover {
-    background: var(--red-soft);
-    color: var(--red);
-    border-color: var(--red);
-}
+.btn-action.btn-edit:hover { background: var(--blue-soft); color: var(--blue); border-color: var(--blue); }
+.btn-action.btn-delete:hover { background: var(--red-soft); color: var(--red); border-color: var(--red); }
 
 /* ── EMPTY STATE ── */
-.empty-state {
-    text-align: center;
-    padding: 56px 20px;
-    color: var(--muted);
-}
+.empty-state { text-align: center; padding: 56px 20px; color: var(--muted); }
 
 .empty-state .empty-icon {
     width: 52px; height: 52px;
@@ -504,16 +538,10 @@ tbody td {
     color: var(--muted);
 }
 
-.empty-state p { font-size: 13px; }
+.empty-state p { font-size: 13px; margin-bottom: 14px; }
 
 /* ── OVERLAY ── */
-.sidebar-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.3);
-    z-index: 999;
-}
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 999; }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
@@ -523,30 +551,26 @@ tbody td {
     .topbar { display: flex; }
     .main { margin-left: 0; padding: 16px; }
     .search-wrap { width: 100%; }
+    .toolbar { flex-direction: column; align-items: stretch; }
     .page-header { flex-direction: column; align-items: flex-start; }
     .page-header > * { width: 100%; }
     .stok-bar-wrap .stok-bar { display: none; }
-    thead th:nth-child(3),
-    tbody td:nth-child(3) { display: none; }
+    thead th:nth-child(4),
+    tbody td:nth-child(4) { display: none; }
     .btn-action { width: 32px; height: 32px; }
 }
 </style>
 </head>
 <body>
 
-<!-- Overlay -->
 <div class="sidebar-overlay" id="overlay"></div>
 
-<!-- Mobile Topbar -->
 <header class="topbar">
-    <button class="btn-icon" id="toggleSidebar">
-        <i class="bi bi-list"></i>
-    </button>
-    <span class="topbar-title">Data Laboratorium</span>
+    <button class="btn-icon" id="toggleSidebar"><i class="bi bi-list"></i></button>
+    <span class="topbar-title">Data Barang</span>
     <div style="width:36px"></div>
 </header>
 
-<!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
         <div class="logo-icon"><i class="bi bi-boxes"></i></div>
@@ -558,40 +582,16 @@ tbody td {
 
     <p class="nav-section">Menu</p>
     <ul style="list-style:none;padding:0;margin:0">
-        <li class="nav-item">
-            <a class="nav-link" href="dashboard.php">
-                <i class="bi bi-grid-1x2"></i> Dashboard
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link active" href="data_lab.php">
-                <i class="bi bi-building-fill"></i> Laboratorium
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="data_barang.php">
-                <i class="bi bi-box-seam-fill"></i> Data Barang
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="data_mhs.php">
-                <i class="bi bi-people-fill"></i> Mahasiswa
-            </a>
-        </li>
+        <li class="nav-item"><a class="nav-link" href="dashboard.php"><i class="bi bi-grid-1x2"></i> Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="data_lab.php"><i class="bi bi-building-fill"></i> Laboratorium</a></li>
+        <li class="nav-item"><a class="nav-link active" href="data_barang.php"><i class="bi bi-box-seam-fill"></i> Data Barang</a></li>
+        <li class="nav-item"><a class="nav-link" href="data_mhs.php"><i class="bi bi-people-fill"></i> Mahasiswa</a></li>
     </ul>
 
     <p class="nav-section">Peminjaman</p>
     <ul style="list-style:none;padding:0;margin:0">
-        <li class="nav-item">
-            <a class="nav-link" href="riwayat_pinjam.php">
-                <i class="bi bi-clock-history"></i> Ongoing
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="arsip_peminjaman.php">
-                <i class="bi bi-archive-fill"></i> Arsip
-            </a>
-        </li>
+        <li class="nav-item"><a class="nav-link" href="riwayat_pinjam.php"><i class="bi bi-clock-history"></i> Ongoing</a></li>
+        <li class="nav-item"><a class="nav-link" href="arsip_peminjaman.php"><i class="bi bi-archive-fill"></i> Arsip</a></li>
     </ul>
 
     <div style="flex:1"></div>
@@ -613,32 +613,47 @@ tbody td {
     </div>
 </aside>
 
-<!-- Main -->
 <main class="main">
 
-    <!-- Page Header -->
     <div class="page-header">
         <div class="page-header-left">
-            <h1>Data Laboratorium</h1>
-            <p>Daftar dan status ketersediaan semua laboratorium</p>
+            <h1>Data Barang</h1>
+            <p>Kelola dan catat seluruh inventaris barang milik laboratorium</p>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <div class="search-wrap">
-                <i class="bi bi-search"></i>
-                <input type="text" class="search-input" id="searchInput" placeholder="Cari laboratorium…">
-            </div>
-            <a href="tambah_data_lab.php" class="btn-primary">
-                <i class="bi bi-plus"></i>
-                <span>Tambah Lab</span>
-            </a>
-        </div>
+        <a href="tambah_data_barang.php<?= $filterLab !== null ? '?id_lab=' . urlencode($filterLab) : ''; ?>" class="btn-primary">
+            <i class="bi bi-plus"></i>
+            <span>Tambah Barang</span>
+        </a>
     </div>
 
-    <!-- Table Card -->
+    <?php if ($filterLab !== null): ?>
+    <div class="filter-chip">
+        <i class="bi bi-funnel-fill"></i>
+        Menampilkan barang dari: <?= htmlspecialchars($activeLabName ?? $filterLab); ?>
+        <a href="data_barang.php" title="Hapus filter"><i class="bi bi-x-circle-fill"></i></a>
+    </div>
+    <?php endif; ?>
+
+    <div class="toolbar">
+        <div class="search-wrap">
+            <i class="bi bi-search"></i>
+            <input type="text" class="search-input" id="searchInput" placeholder="Cari nama, kode, atau kategori barang…">
+        </div>
+        <select class="filter-select" id="labFilterSelect" onchange="if(this.value){window.location='data_barang.php?id_lab='+encodeURIComponent(this.value);}else{window.location='data_barang.php';}">
+            <option value="">Semua Lab</option>
+            <?php while ($l = mysqli_fetch_assoc($daftarLab)): ?>
+                <option value="<?= htmlspecialchars($l['id_lab']); ?>" <?= ($filterLab == $l['id_lab']) ? 'selected' : ''; ?>>
+                    <?= htmlspecialchars($l['nama_lab']); ?>
+                </option>
+            <?php endwhile; ?>
+        </select>
+        <div class="spacer"></div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <div class="card-header-left">
-                <h2>Daftar Laboratorium</h2>
+                <h2>Daftar Barang</h2>
                 <span>Diurutkan berdasarkan nama</span>
             </div>
             <span class="count-chip" id="rowCount">—</span>
@@ -649,76 +664,74 @@ tbody td {
                 <thead>
                     <tr>
                         <th style="width:48px">#</th>
-                        <th>Laboratorium</th>
-                        <th>Stok / Kuota</th>
+                        <th>Barang</th>
+                        <th>Lab</th>
+                        <th>Stok</th>
+                        <th>Kondisi</th>
                         <th>Status</th>
-                        <th style="width:110px">Aksi</th>
+                        <th style="width:100px">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                 <?php
                 $no = 1;
                 if (mysqli_num_rows($query) > 0):
-                    while ($lab = mysqli_fetch_assoc($query)):
+                    while ($barang = mysqli_fetch_assoc($query)):
 
-                        $statusClass = $lab['status'] === 'availabel'
-                            ? 'bg-success'
-                            : 'bg-danger';
+                        $badgeStatus = $barang['status'] === 'availabel' ? 'badge-available' : 'badge-unavailable';
+                        $statusText  = $barang['status'] === 'availabel' ? 'Tersedia' : 'Tidak Tersedia';
 
-                        $statusText = $lab['status'] === 'availabel'
-                            ? 'Tersedia'
-                            : 'Tidak Tersedia';
+                        $badgeKondisi = 'badge-' . $barang['kondisi'];
+                        $kondisiText  = ucfirst($barang['kondisi']);
 
-                        $badgeClass = $lab['status'] === 'availabel'
-                            ? 'badge-available'
-                            : 'badge-unavailable';
-
-                        // Stok bar color
-                        $stok = (int)$lab['stok'];
+                        $stok = (int)$barang['stok'];
                         $barClass = $stok <= 0 ? 'empty' : ($stok <= 3 ? 'low' : '');
-                        // We'll use a fixed max of 20 for the bar; adjust if needed
                         $barPct = min(100, ($stok / 20) * 100);
                 ?>
                     <tr>
                         <td class="row-num"><?= $no++; ?></td>
                         <td>
-                            <div class="lab-cell">
-                                <span class="lab-name"><?= htmlspecialchars($lab['nama_lab']); ?></span>
-                                <div class="lab-meta">
+                            <div class="item-cell">
+                                <span class="item-name"><?= htmlspecialchars($barang['nama_barang']); ?></span>
+                                <div class="item-meta">
                                     <span class="meta-tag">
                                         <i class="bi bi-hash"></i>
-                                        <?= htmlspecialchars($lab['id_lab']); ?>
+                                        <?= htmlspecialchars($barang['kode_barang']); ?>
                                     </span>
+                                    <?php if (!empty($barang['kategori'])): ?>
+                                    <span class="tag-kategori"><?= htmlspecialchars($barang['kategori']); ?></span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
+                        </td>
+                        <td>
+                            <a class="lab-link" href="data_barang.php?id_lab=<?= urlencode($barang['id_lab']); ?>">
+                                <i class="bi bi-building"></i> <?= htmlspecialchars($barang['nama_lab']); ?>
+                            </a>
                         </td>
                         <td>
                             <div class="stok-bar-wrap">
                                 <span class="stok-num"><?= $stok; ?></span>
                                 <div class="stok-bar">
-                                    <div class="stok-bar-fill <?= $barClass; ?>"
-                                         style="width:<?= $barPct; ?>%"></div>
+                                    <div class="stok-bar-fill <?= $barClass; ?>" style="width:<?= $barPct; ?>%"></div>
                                 </div>
                             </div>
                         </td>
                         <td>
-                            <span class="badge <?= $badgeClass; ?>">
-                                <?= $statusText; ?>
-                            </span>
+                            <span class="badge <?= $badgeKondisi; ?>"><?= $kondisiText; ?></span>
+                        </td>
+                        <td>
+                            <span class="badge <?= $badgeStatus; ?>"><?= $statusText; ?></span>
                         </td>
                         <td>
                             <div class="action-buttons">
-                                <a href="edit_data_lab.php?id=<?= urlencode($lab['id_lab']); ?>"
-                                   class="btn-action btn-edit" title="Edit Lab">
+                                <a href="edit_data_barang.php?id=<?= urlencode($barang['id_barang']); ?>"
+                                   class="btn-action btn-edit" title="Edit Barang">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                <a href="inventaris_lab.php?id_lab=<?= urlencode($lab['id_lab']); ?>"
-                                   class="btn-action btn-inventaris" title="Inventaris Lab">
-                                    <i class="bi bi-box-seam"></i>
-                                </a>
-                                <a href="hapus_data_lab.php?id=<?= urlencode($lab['id_lab']); ?>"
-                                   class="btn-action btn-delete" title="Hapus Lab"
-                                   onclick="return confirm('Yakin ingin menghapus lab \'<?= htmlspecialchars(addslashes($lab['nama_lab'])); ?>\' beserta seluruh data inventarisnya? Tindakan ini tidak dapat dibatalkan.')">
+                                <a href="hapus_data_barang.php?id=<?= urlencode($barang['id_barang']); ?><?= $filterLab !== null ? '&id_lab=' . urlencode($filterLab) : ''; ?>"
+                                   class="btn-action btn-delete" title="Hapus Barang"
+                                   onclick="return confirm('Yakin ingin menghapus barang \'<?= htmlspecialchars(addslashes($barang['nama_barang'])); ?>\'? Tindakan ini tidak dapat dibatalkan.')">
                                     <i class="bi bi-trash"></i>
                                 </a>
                             </div>
@@ -726,10 +739,13 @@ tbody td {
                     </tr>
                 <?php endwhile; else: ?>
                     <tr>
-                        <td colspan="5">
+                        <td colspan="7">
                             <div class="empty-state">
-                                <div class="empty-icon"><i class="bi bi-building"></i></div>
-                                <p>Data laboratorium belum tersedia.</p>
+                                <div class="empty-icon"><i class="bi bi-box-seam"></i></div>
+                                <p>Belum ada data barang<?= $filterLab !== null ? ' untuk lab ini' : ''; ?>.</p>
+                                <a href="tambah_data_barang.php<?= $filterLab !== null ? '?id_lab=' . urlencode($filterLab) : ''; ?>" class="btn-primary">
+                                    <i class="bi bi-plus"></i><span>Tambah Barang</span>
+                                </a>
                             </div>
                         </td>
                     </tr>
@@ -742,7 +758,6 @@ tbody td {
 </main>
 
 <script>
-// Sidebar toggle
 const sidebar   = document.getElementById('sidebar');
 const overlay   = document.getElementById('overlay');
 const toggleBtn = document.getElementById('toggleSidebar');
@@ -757,7 +772,6 @@ overlay.addEventListener('click', () => {
     overlay.classList.remove('show');
 });
 
-// Tag rows + count
 const tableBody = document.getElementById('tableBody');
 const rowCount  = document.getElementById('rowCount');
 
@@ -769,9 +783,8 @@ document.querySelectorAll('#tableBody tr').forEach(row => {
 });
 
 const searchableRows = Array.from(tableBody.querySelectorAll('tr[data-searchable]'));
-rowCount.textContent = searchableRows.length + ' lab';
+rowCount.textContent = searchableRows.length + ' barang';
 
-// Live search
 document.getElementById('searchInput').addEventListener('input', function () {
     const q = this.value.toLowerCase().trim();
     let visible = 0;
@@ -780,7 +793,7 @@ document.getElementById('searchInput').addEventListener('input', function () {
         row.style.display = match ? '' : 'none';
         if (match) visible++;
     });
-    rowCount.textContent = visible + ' lab';
+    rowCount.textContent = visible + ' barang';
 });
 </script>
 
