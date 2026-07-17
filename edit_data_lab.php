@@ -12,11 +12,12 @@ $id = mysqli_real_escape_string($koneksi, $id);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nama_lab = mysqli_real_escape_string($koneksi, $_POST['nama_lab']);
+    $lokasi   = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
     $stok     = (int) $_POST['stok'];
     $status   = $_POST['status'] === 'availabel' ? 'availabel' : 'unavailabel';
 
     mysqli_query($koneksi, "UPDATE data_lab
-        SET nama_lab = '$nama_lab', stok = '$stok', status = '$status'
+        SET nama_lab = '$nama_lab', stok = '$stok', status = '$status', lokasi = '$lokasi'
         WHERE id_lab = '$id'");
 
     header('Location: data_lab.php');
@@ -89,6 +90,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                     <label>Nama Laboratorium</label>
                     <input type="text" name="nama_lab" class="form-control"
                            value="<?= htmlspecialchars($lab['nama_lab']); ?>" required>
+                </div>
+                <div class="form-group">
+                    <label>Lokasi</label>
+                    <input type="text" name="lokasi" class="form-control"
+                           value="<?= htmlspecialchars($lab['lokasi']); ?>" required>
                 </div>
                 <div class="form-group">
                     <label>Stok / Kuota</label>

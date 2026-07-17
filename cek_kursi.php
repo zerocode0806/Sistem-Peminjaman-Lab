@@ -4,8 +4,8 @@ include 'koneksi.php';
 
 header('Content-Type: application/json');
 
-/* Hanya bisa diakses oleh mahasiswa yang sudah login */
-if (!isset($_SESSION['mahasiswa']['nim'])) {
+/* Bisa diakses oleh mahasiswa yang login maupun admin */
+if (!isset($_SESSION['mahasiswa']['nim']) && !isset($_SESSION['user'])) {
     echo json_encode(['booked' => []]);
     exit;
 }
