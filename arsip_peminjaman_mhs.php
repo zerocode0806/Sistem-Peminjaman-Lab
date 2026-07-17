@@ -5,27 +5,29 @@ include 'koneksi.php';
 /* ===============================
    CEK LOGIN ADMIN
 ================================ */
-if (!isset($_SESSION['user'])) {
+if (!isset($_SESSION['mahasiswa'])) {
     header('Location: index.php');
     exit;
 }
 
 /* ===============================
-   AMBIL DATA RIWAYAT PINJAM
+   AMBIL DATA RIWAYAT PINJAM MAHASISWA
+   (status selesai diproses)
 ================================ */
 $query = mysqli_query($koneksi, "
     SELECT *
     FROM data_pinjam
-    WHERE status IN ('selesai', 'ditolak')
+    WHERE status IN ('selesai', 'ditolak') AND nim = '{$_SESSION['mahasiswa']['nim']}'
     ORDER BY tanggal DESC
 ");
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arsip Peminjaman – LabSystem</title>
+<title>Riwayat Peminjaman – LabSystem</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,8 +50,6 @@ $query = mysqli_query($koneksi, "
     --green-soft: #F0FDF4;
     --blue:       #2563EB;
     --blue-soft:  #EFF4FF;
-    --cyan:       #0891B2;
-    --cyan-soft:  #ECFEFF;
     --sidebar-w:  228px;
     --radius:     10px;
 }
@@ -238,41 +238,10 @@ body {
     flex-wrap: wrap;
 }
 
-/* ── FILTER TABS ── */
-.filter-tabs {
-    display: flex;
-    gap: 4px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    padding: 3px;
-    border-radius: 8px;
-}
-
-.filter-tab {
-    padding: 5px 12px;
-    border-radius: 6px;
-    font-size: 12.5px;
-    font-weight: 500;
-    color: var(--muted);
-    cursor: pointer;
-    border: none;
-    background: transparent;
-    font-family: 'DM Sans', sans-serif;
-    transition: background .15s, color .15s;
-    white-space: nowrap;
-}
-
-.filter-tab:hover { color: var(--text); }
-.filter-tab.active {
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: 0 1px 3px rgba(0,0,0,.08);
-}
-
 /* ── SEARCH ── */
 .search-wrap {
     position: relative;
-    width: 220px;
+    width: 240px;
 }
 
 .search-wrap i {
@@ -419,10 +388,8 @@ tbody td:last-child { text-align: right; }
 
 .badge-disetujui { background: var(--green-soft); color: var(--green); }
 .badge-disetujui::before { background: var(--green); }
-.badge-ditolak   { background: var(--red-soft);   color: var(--red);   }
+.badge-ditolak   { background: var(--red-soft);   color: var(--red); }
 .badge-ditolak::before   { background: var(--red); }
-.badge-selesai   { background: var(--cyan-soft);  color: var(--cyan);  }
-.badge-selesai::before   { background: var(--cyan); }
 .badge-default   { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
 .badge-default::before   { background: var(--muted); }
 
@@ -446,14 +413,14 @@ tbody td:last-child { text-align: right; }
 
 .btn-detail:hover { background: var(--bg); border-color: #ccc; color: var(--text); }
 
-/* ── EMPTY / NO-RESULT STATES ── */
-.state-row td {
+/* ── NO-RESULT ROW ── */
+.no-result-row td {
     text-align: center;
     padding: 52px 20px;
     color: var(--muted);
 }
 
-.state-icon {
+.no-result-row .empty-icon {
     width: 48px; height: 48px;
     background: var(--bg);
     border-radius: 50%;
@@ -464,7 +431,7 @@ tbody td:last-child { text-align: right; }
     border: 1px solid var(--border);
 }
 
-.state-row p { font-size: 13px; }
+.no-result-row p { font-size: 13px; }
 
 /* ── OVERLAY ── */
 .sidebar-overlay {
@@ -483,11 +450,9 @@ tbody td:last-child { text-align: right; }
     .topbar { display: flex; }
     .main { margin-left: 0; padding: 16px; }
     .search-wrap { width: 100%; }
-    .toolbar { width: 100%; flex-direction: column; align-items: stretch; }
-    .filter-tabs { justify-content: stretch; }
-    .filter-tab { flex: 1; text-align: center; }
     .page-header { flex-direction: column; align-items: flex-start; }
     .page-header > * { width: 100%; }
+    .toolbar { width: 100%; }
     thead th:nth-child(3),
     thead th:nth-child(4),
     tbody td:nth-child(3),
@@ -505,7 +470,7 @@ tbody td:last-child { text-align: right; }
     <button class="btn-icon" id="toggleSidebar">
         <i class="bi bi-list"></i>
     </button>
-    <span class="topbar-title">Arsip Peminjaman</span>
+    <span class="topbar-title">Riwayat Peminjaman</span>
     <div style="width:36px"></div>
 </header>
 
@@ -515,39 +480,32 @@ tbody td:last-child { text-align: right; }
         <div class="logo-icon"><i class="bi bi-boxes"></i></div>
         <div class="sidebar-logo-text">
             <strong>LabSystem</strong>
-            <span>Admin Panel</span>
+            <span>Mahasiswa</span>
         </div>
     </div>
 
     <p class="nav-section">Menu</p>
     <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
-            <a class="nav-link" href="dashboard.php">
+            <a class="nav-link" href="dashboard_mhs.php">
                 <i class="bi bi-grid-1x2"></i> Dashboard
             </a>
         </li>
-        <li class="nav-item">
-            <a class="nav-link" href="data_lab.php">
-                <i class="bi bi-building-fill"></i> Laboratorium
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="data_mhs.php">
-                <i class="bi bi-people-fill"></i> Mahasiswa
-            </a>
-        </li>
+        
     </ul>
 
     <p class="nav-section">Peminjaman</p>
     <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
-            <a class="nav-link" href="riwayat_pinjam.php">
+            <a class="nav-link " href="riwayat_pinjam_mhs.php">
                 <i class="bi bi-clock-history"></i> Ongoing
             </a>
         </li>
+    </ul>
+    <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
-            <a class="nav-link active" href="arsip_peminjaman.php">
-                <i class="bi bi-archive-fill"></i> Arsip
+            <a class="nav-link active" href="arsip_peminjaman_mhs.php">
+                <i class="bi bi-archive-fill"></i> Riwayat Saya
             </a>
         </li>
     </ul>
@@ -563,10 +521,10 @@ tbody td:last-child { text-align: right; }
     </ul>
 
     <div class="sidebar-user">
-        <div class="avatar"><?= strtoupper(substr($_SESSION['user']['nama'], 0, 1)) ?></div>
+        <div class="avatar"><?= strtoupper(substr($_SESSION['mahasiswa']['nama'], 0, 1)) ?></div>
         <div class="sidebar-user-info">
-            <strong><?= htmlspecialchars($_SESSION['user']['nama']) ?></strong>
-            <span>Administrator</span>
+            <strong><?= htmlspecialchars($_SESSION['mahasiswa']['nama']) ?></strong>
+            <span>Mahasiswa</span>
         </div>
     </div>
 </aside>
@@ -577,20 +535,13 @@ tbody td:last-child { text-align: right; }
     <!-- Page Header -->
     <div class="page-header">
         <div class="page-header-left">
-            <h1>Arsip Peminjaman</h1>
-            <p>Rekap peminjaman yang telah selesai atau ditolak</p>
+            <h1>Riwayat Peminjaman</h1>
+            <p>Daftar peminjaman dengan status disetujui</p>
         </div>
         <div class="toolbar">
-            <!-- Filter Tabs -->
-            <div class="filter-tabs">
-                <button class="filter-tab active" data-filter="all">Semua</button>
-                <button class="filter-tab" data-filter="selesai">Selesai</button>
-                <button class="filter-tab" data-filter="ditolak">Ditolak</button>
-            </div>
-            <!-- Search -->
             <div class="search-wrap">
                 <i class="bi bi-search"></i>
-                <input type="text" class="search-input" id="searchInput" placeholder="Cari NIM atau lab…">
+                <input type="text" class="search-input" id="searchInput" placeholder="Cari NIM atau laboratorium…">
             </div>
         </div>
     </div>
@@ -599,8 +550,8 @@ tbody td:last-child { text-align: right; }
     <div class="card">
         <div class="card-header">
             <div class="card-header-left">
-                <h2>Arsip Peminjaman</h2>
-                <span>Peminjaman selesai &amp; ditolak</span>
+                <h2>Peminjaman Disetujui</h2>
+                <span>Semua peminjaman aktif yang sudah diproses</span>
             </div>
             <span class="count-chip" id="rowCount">—</span>
         </div>
@@ -619,10 +570,10 @@ tbody td:last-child { text-align: right; }
                 </thead>
                 <tbody id="tableBody">
                 <?php if (mysqli_num_rows($query) == 0): ?>
-                    <tr class="state-row" id="emptyDefault">
+                    <tr class="no-result-row">
                         <td colspan="6">
-                            <div class="state-icon"><i class="bi bi-archive"></i></div>
-                            <p>Belum ada data arsip peminjaman.</p>
+                            <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                            <p>Belum ada riwayat peminjaman yang disetujui.</p>
                         </td>
                     </tr>
                 <?php else: ?>
@@ -630,11 +581,10 @@ tbody td:last-child { text-align: right; }
                         $badgeClass = match($row['status']) {
                             'disetujui' => 'badge-disetujui',
                             'ditolak'   => 'badge-ditolak',
-                            'selesai'   => 'badge-selesai',
                             default     => 'badge-default'
                         };
                     ?>
-                    <tr data-status="<?= htmlspecialchars($row['status']) ?>">
+                    <tr>
                         <td><span class="nim-text"><?= htmlspecialchars($row['nim']) ?></span></td>
                         <td><?= htmlspecialchars($row['nama_lab']) ?></td>
                         <td><?= date('d M Y', strtotime($row['tanggal'])) ?></td>
@@ -649,7 +599,7 @@ tbody td:last-child { text-align: right; }
                             </span>
                         </td>
                         <td>
-                            <a href="detail_pinjam.php?id=<?= $row['id_data'] ?>" class="btn-detail">
+                            <a href="checkout_pinjam.php?id=<?= $row['id_data'] ?>" class="btn-detail">
                                 <i class="bi bi-arrow-right"></i> Detail
                             </a>
                         </td>
@@ -664,7 +614,7 @@ tbody td:last-child { text-align: right; }
 </main>
 
 <script>
-// ── Sidebar toggle ──
+// Sidebar toggle
 const sidebar   = document.getElementById('sidebar');
 const overlay   = document.getElementById('overlay');
 const toggleBtn = document.getElementById('toggleSidebar');
@@ -679,71 +629,50 @@ overlay.addEventListener('click', () => {
     overlay.classList.remove('show');
 });
 
-// ── Search & filter ──
-const tableBody      = document.getElementById('tableBody');
-const rowCountEl     = document.getElementById('rowCount');
-const searchInput    = document.getElementById('searchInput');
-const filterTabBtns  = document.querySelectorAll('.filter-tab');
+// Tag rows + initial count
+const tableBody = document.getElementById('tableBody');
+const rowCount  = document.getElementById('rowCount');
 
-// Tag all data rows with search text
-document.querySelectorAll('#tableBody tr[data-status]').forEach(row => {
-    row.setAttribute('data-search-text', row.textContent.toLowerCase());
-});
-
-const allDataRows = Array.from(tableBody.querySelectorAll('tr[data-status]'));
-let activeFilter = 'all';
-
-function applyFilters() {
-    const q = searchInput.value.toLowerCase().trim();
-    let visible = 0;
-
-    allDataRows.forEach(row => {
-        const statusMatch = activeFilter === 'all' || row.getAttribute('data-status') === activeFilter;
-        const searchMatch = !q || row.getAttribute('data-search-text').includes(q);
-        const show = statusMatch && searchMatch;
-        row.style.display = show ? '' : 'none';
-        if (show) visible++;
-    });
-
-    rowCountEl.textContent = visible + ' data';
-
-    // Dynamic empty state for search
-    let emptySearch = tableBody.querySelector('.search-empty-row');
-    if (visible === 0 && allDataRows.length > 0) {
-        if (!emptySearch) {
-            emptySearch = document.createElement('tr');
-            emptySearch.className = 'search-empty-row state-row';
-            emptySearch.innerHTML = `<td colspan="6">
-                <div class="state-icon"><i class="bi bi-search"></i></div>
-                <p id="emptyMsg"></p>
-            </td>`;
-            tableBody.appendChild(emptySearch);
-        }
-        const msg = q
-            ? `Tidak ada hasil untuk "<strong>${searchInput.value}</strong>"`
-            : `Tidak ada data dengan filter "<strong>${activeFilter}</strong>"`;
-        emptySearch.querySelector('#emptyMsg').innerHTML = msg;
-        emptySearch.style.display = '';
-    } else if (emptySearch) {
-        emptySearch.style.display = 'none';
+document.querySelectorAll('#tableBody tr').forEach(row => {
+    if (row.querySelectorAll('td').length > 1) {
+        row.setAttribute('data-searchable', '');
+        row.setAttribute('data-search-text', row.textContent.toLowerCase());
     }
-}
-
-// Set initial count
-rowCountEl.textContent = allDataRows.length + ' data';
-
-// Filter tabs
-filterTabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        filterTabBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeFilter = btn.getAttribute('data-filter');
-        applyFilters();
-    });
 });
 
-// Search input
-searchInput.addEventListener('input', applyFilters);
+const searchableRows = Array.from(tableBody.querySelectorAll('tr[data-searchable]'));
+rowCount.textContent = searchableRows.length + ' data';
+
+// Live search
+document.getElementById('searchInput').addEventListener('input', function () {
+    const q = this.value.toLowerCase().trim();
+    let visible = 0;
+    searchableRows.forEach(row => {
+        const match = row.getAttribute('data-search-text').includes(q);
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    rowCount.textContent = visible + ' data';
+
+    // Show/hide empty search state
+    let emptyRow = tableBody.querySelector('.search-empty-row');
+    if (visible === 0 && searchableRows.length > 0) {
+        if (!emptyRow) {
+            emptyRow = document.createElement('tr');
+            emptyRow.className = 'search-empty-row no-result-row';
+            emptyRow.innerHTML = `<td colspan="6">
+                <div class="empty-icon"><i class="bi bi-search"></i></div>
+                <p>Tidak ada hasil untuk "<strong>${this.value}</strong>"</p>
+            </td>`;
+            tableBody.appendChild(emptyRow);
+        } else {
+            emptyRow.querySelector('p').innerHTML = `Tidak ada hasil untuk "<strong>${this.value}</strong>"`;
+            emptyRow.style.display = '';
+        }
+    } else if (emptyRow) {
+        emptyRow.style.display = 'none';
+    }
+});
 </script>
 
 </body>

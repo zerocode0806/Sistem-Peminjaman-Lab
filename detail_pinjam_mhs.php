@@ -31,6 +31,7 @@ $query = mysqli_query($koneksi, "
         p.jam_mulai,
         p.jam_selesai,
         p.status,
+        p.kursi,
 
         m.nama AS nama_mhs,
         m.no_telepon,
@@ -147,6 +148,11 @@ body {
                     <div class="mb-2">
                         <div class="detail-label">Laboratorium</div>
                         <div class="detail-value"><?= htmlspecialchars($data['nama_lab']) ?></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="detail-label">Meja</div>
+                        <div class="detail-value"><?= htmlspecialchars($data['kursi']) ?></div>
                     </div>
 
                     <div class="mb-2">

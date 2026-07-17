@@ -7,84 +7,41 @@ if (!isset($_SESSION['user'])) {
     exit;
 }
 
-/* Ambil lab yang tersedia */
-$labQuery = mysqli_query($koneksi, "
-    SELECT id_lab, nama_lab
-    FROM data_lab
-    WHERE status = 'availabel'
-    ORDER BY nama_lab ASC
-");
-
-/* Simpan data */
 /* Simpan data */
 if (isset($_POST['simpan'])) {
 
-    $nim            = mysqli_real_escape_string($koneksi, $_POST['nim']);
-    $nama_mahasiswa = mysqli_real_escape_string($koneksi, $_POST['nama_mahasiswa']);
-    $no_telp        = mysqli_real_escape_string($koneksi, $_POST['no_telp']);
-    $alamat         = mysqli_real_escape_string($koneksi, $_POST['alamat']);
-    $nama_lab       = mysqli_real_escape_string($koneksi, $_POST['nama_lab']);
-    $tanggal        = $_POST['tanggal'];
-    $jam_mulai      = $_POST['jam_mulai'];
-    $jam_selesai    = $_POST['jam_selesai'];
-    $status         = 'menunggu';
+    $nama_lab      = mysqli_real_escape_string($koneksi, $_POST['nama_lab']);
+    $jumlah_kursi  = (int) $_POST['jumlah_kursi'];
+    $lokasi        = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
+    $status        = mysqli_real_escape_string($koneksi, $_POST['status']);
 
-    if ($jam_selesai <= $jam_mulai) {
-        $error = "Jam selesai harus lebih besar dari jam mulai.";
+    if ($jumlah_kursi <= 0) {
+        $error = "Jumlah kursi harus lebih besar dari 0.";
     } else {
 
-        // Mulai transaksi
-        mysqli_begin_transaction($koneksi);
+        // 🔎 Cek duplikat nama lab
+        $cek = mysqli_query($koneksi, "
+            SELECT id_lab FROM data_lab WHERE nama_lab = '$nama_lab'
+        ");
 
-        try {
+        if (mysqli_num_rows($cek) > 0) {
+            $error = "Nama laboratorium sudah terdaftar.";
+        } else {
 
-            // 🔎 Cek stok lab
-            $cekStok = mysqli_query($koneksi, "
-                SELECT stok 
-                FROM data_lab 
-                WHERE nama_lab = '$nama_lab' 
-                FOR UPDATE
-            ");
-
-            $dataLab = mysqli_fetch_assoc($cekStok);
-
-            if (!$dataLab || $dataLab['stok'] <= 0) {
-                throw new Exception("Stok laboratorium sudah habis.");
-            }
-
-            // ✅ Insert data peminjaman
+            // ✅ Insert data lab
             $insert = mysqli_query($koneksi, "
-                INSERT INTO data_pinjam
-                (nim, nama_mahasiswa, no_telp, alamat, nama_lab, tanggal, jam_mulai, jam_selesai, status)
+                INSERT INTO data_lab
+                (nama_lab, stok, lokasi, status)
                 VALUES
-                ('$nim', '$nama_mahasiswa', '$no_telp', '$alamat', '$nama_lab', '$tanggal', '$jam_mulai', '$jam_selesai', '$status')
+                ('$nama_lab', '$jumlah_kursi', '$lokasi', '$status')
             ");
 
             if (!$insert) {
-                throw new Exception("Gagal menyimpan data peminjaman.");
+                $error = "Gagal menyimpan data laboratorium.";
+            } else {
+                header("Location: data_lab.php?msg=success");
+                exit;
             }
-
-            // ➖ Kurangi stok
-            $updateStok = mysqli_query($koneksi, "
-                UPDATE data_lab 
-                SET stok = stok - 1 
-                WHERE nama_lab = '$nama_lab'
-            ");
-
-            if (!$updateStok) {
-                throw new Exception("Gagal mengurangi stok.");
-            }
-
-            // Commit jika semua berhasil
-            mysqli_commit($koneksi);
-
-            header("Location: dashboard.php?msg=success");
-            exit;
-
-        } catch (Exception $e) {
-
-            mysqli_rollback($koneksi);
-            $error = $e->getMessage();
         }
     }
 }
@@ -95,7 +52,7 @@ if (isset($_POST['simpan'])) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tambah Peminjaman – LabSystem</title>
+<title>Tambah Laboratorium – LabSystem</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -367,8 +324,7 @@ body {
 }
 
 .form-row-2 { grid-template-columns: 1fr 1fr; }
-.form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
-.form-row-nim { grid-template-columns: 140px 1fr; }
+.form-row-kursi { grid-template-columns: 1fr 140px; }
 
 label {
     display: block;
@@ -380,9 +336,14 @@ label {
     margin-bottom: 6px;
 }
 
+.hint {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 6px;
+}
+
 input[type="text"],
-input[type="date"],
-input[type="time"],
+input[type="number"],
 select,
 textarea {
     width: 100%;
@@ -400,8 +361,7 @@ textarea {
 }
 
 input[type="text"]:focus,
-input[type="date"]:focus,
-input[type="time"]:focus,
+input[type="number"]:focus,
 select:focus,
 textarea:focus {
     border-color: var(--accent);
@@ -409,7 +369,7 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(26,26,26,.06);
 }
 
-input.nim-input { font-family: 'DM Mono', monospace; font-size: 13px; }
+input.kursi-input { font-family: 'DM Mono', monospace; font-size: 13px; }
 
 textarea { resize: vertical; min-height: 72px; }
 
@@ -494,8 +454,8 @@ select {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: #FFFBEB;
-    color: #D97706;
+    background: var(--green-soft);
+    color: var(--green);
     font-size: 11.5px;
     font-weight: 500;
     padding: 4px 9px;
@@ -506,9 +466,16 @@ select {
     content: '';
     width: 5px; height: 5px;
     border-radius: 50%;
-    background: #D97706;
+    background: var(--green);
     flex-shrink: 0;
 }
+
+.summary-status.off {
+    background: var(--red-soft);
+    color: var(--red);
+}
+
+.summary-status.off::before { background: var(--red); }
 
 /* ── BUTTONS ── */
 .form-actions {
@@ -588,13 +555,11 @@ select {
     .sidebar-overlay.show { display: block; }
     .topbar { display: flex; }
     .main { margin-left: 0; padding: 16px; }
-    .form-row-nim { grid-template-columns: 1fr; }
-    .form-row-3 { grid-template-columns: 1fr 1fr; }
+    .form-row-kursi { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
-    .form-row-2,
-    .form-row-3 { grid-template-columns: 1fr; }
+    .form-row-2 { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -608,7 +573,7 @@ select {
     <button class="btn-icon" id="toggleSidebar">
         <i class="bi bi-list"></i>
     </button>
-    <span class="topbar-title">Tambah Peminjaman</span>
+    <span class="topbar-title">Tambah Laboratorium</span>
     <div style="width:36px"></div>
 </header>
 
@@ -630,7 +595,7 @@ select {
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="data_lab.php">
+            <a class="nav-link active" href="data_lab.php">
                 <i class="bi bi-building-fill"></i> Laboratorium
             </a>
         </li>
@@ -680,12 +645,12 @@ select {
 
     <!-- Page Header -->
     <div class="page-header">
-        <a href="dashboard.php" class="page-header-back">
+        <a href="data_lab.php" class="page-header-back">
             <i class="bi bi-arrow-left"></i>
         </a>
         <div class="page-header-text">
-            <h1>Tambah Peminjaman</h1>
-            <p>Isi formulir untuk mendaftarkan peminjaman laboratorium baru</p>
+            <h1>Tambah Laboratorium</h1>
+            <p>Isi formulir untuk mendaftarkan laboratorium baru</p>
         </div>
     </div>
 
@@ -703,80 +668,41 @@ select {
             <!-- LEFT: Form Fields -->
             <div style="display:flex;flex-direction:column;gap:16px;">
 
-                <!-- Card: Data Mahasiswa -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-header-icon">
-                            <i class="bi bi-person-fill"></i>
-                        </div>
-                        <h2>Data Mahasiswa</h2>
-                    </div>
-                    <div class="card-body">
-
-                        <div class="form-row form-row-nim">
-                            <div class="form-group" style="margin-bottom:0">
-                                <label>NIM</label>
-                                <input type="text" name="nim" class="nim-input" placeholder="e.g. 2201234567" required>
-                            </div>
-                            <div class="form-group" style="margin-bottom:0">
-                                <label>Nama Mahasiswa</label>
-                                <input type="text" name="nama_mahasiswa" placeholder="Nama lengkap" required>
-                            </div>
-                        </div>
-
-                        <div class="section-divider"></div>
-
-                        <div class="form-row form-row-2">
-                            <div class="form-group" style="margin-bottom:0">
-                                <label>No. Telepon</label>
-                                <input type="text" name="no_telp" placeholder="08xxxxxxxxxx" required>
-                            </div>
-                            <div class="form-group" style="margin-bottom:0">
-                                <label>Alamat</label>
-                                <textarea name="alamat" placeholder="Alamat lengkap mahasiswa" required></textarea>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                <!-- Card: Detail Peminjaman -->
+                <!-- Card: Data Laboratorium -->
                 <div class="card">
                     <div class="card-header">
                         <div class="card-header-icon">
                             <i class="bi bi-building"></i>
                         </div>
-                        <h2>Detail Peminjaman</h2>
+                        <h2>Data Laboratorium</h2>
                     </div>
                     <div class="card-body">
 
                         <div class="form-group">
-                            <label>Laboratorium</label>
-                            <select name="nama_lab" id="selectLab" required>
-                                <option value="">— Pilih Laboratorium —</option>
-                                <?php while ($lab = mysqli_fetch_assoc($labQuery)): ?>
-                                    <option value="<?= htmlspecialchars($lab['nama_lab']) ?>">
-                                        <?= htmlspecialchars($lab['nama_lab']) ?>
-                                    </option>
-                                <?php endwhile; ?>
-                            </select>
+                            <label>Nama Laboratorium</label>
+                            <input type="text" name="nama_lab" id="inputNamaLab" placeholder="e.g. Lab Jaringan Komputer" required>
                         </div>
 
                         <div class="section-divider"></div>
 
-                        <div class="form-row form-row-3">
+                        <div class="form-row form-row-kursi">
                             <div class="form-group" style="margin-bottom:0">
-                                <label>Tanggal</label>
-                                <input type="date" name="tanggal" id="inputTanggal" required>
+                                <label>Lokasi</label>
+                                <input type="text" name="lokasi" id="inputLokasi" placeholder="e.g. Gedung A Lantai 2">
                             </div>
                             <div class="form-group" style="margin-bottom:0">
-                                <label>Jam Mulai</label>
-                                <input type="time" name="jam_mulai" id="inputMulai" required>
+                                <label>Jumlah Kursi</label>
+                                <input type="number" name="jumlah_kursi" id="inputKursi" class="kursi-input" min="1" placeholder="0" required>
                             </div>
-                            <div class="form-group" style="margin-bottom:0">
-                                <label>Jam Selesai</label>
-                                <input type="time" name="jam_selesai" id="inputSelesai" required>
-                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select name="status" id="selectStatus" required>
+                                <option value="availabel" selected>Tersedia</option>
+                                <option value="tidak availabel">Tidak Tersedia</option>
+                            </select>
+                            <p class="hint">Menentukan apakah lab bisa langsung dipinjam.</p>
                         </div>
 
                     </div>
@@ -787,36 +713,36 @@ select {
             <!-- RIGHT: Summary + Actions -->
             <div>
                 <div class="summary-card">
-                    <div class="summary-header">Ringkasan Peminjaman</div>
+                    <div class="summary-header">Ringkasan Laboratorium</div>
                     <div class="summary-body">
 
                         <div class="summary-row">
                             <span class="summary-key">Status</span>
-                            <span class="summary-status">Menunggu</span>
+                            <span class="summary-status" id="sumStatus">Tersedia</span>
                         </div>
 
                         <div class="summary-divider"></div>
 
                         <div class="summary-row">
-                            <span class="summary-key">Lab</span>
-                            <span class="summary-val" id="sumLab">—</span>
+                            <span class="summary-key">Nama Lab</span>
+                            <span class="summary-val" id="sumNama">—</span>
                         </div>
                         <div class="summary-row">
-                            <span class="summary-key">Tanggal</span>
-                            <span class="summary-val" id="sumTanggal">—</span>
+                            <span class="summary-key">Lokasi</span>
+                            <span class="summary-val" id="sumLokasi">—</span>
                         </div>
                         <div class="summary-row">
-                            <span class="summary-key">Waktu</span>
-                            <span class="summary-val" id="sumWaktu">—</span>
+                            <span class="summary-key">Jumlah Kursi</span>
+                            <span class="summary-val" id="sumKursi">—</span>
                         </div>
 
                         <div class="summary-divider"></div>
 
                         <div class="form-actions">
                             <button type="submit" name="simpan" class="btn-submit">
-                                <i class="bi bi-check-lg"></i> Simpan Peminjaman
+                                <i class="bi bi-check-lg"></i> Simpan Laboratorium
                             </button>
-                            <a href="dashboard.php" class="btn-cancel">
+                            <a href="data_lab.php" class="btn-cancel">
                                 <i class="bi bi-x"></i> Batal
                             </a>
                         </div>
@@ -848,30 +774,30 @@ overlay.addEventListener('click', () => {
 });
 
 // Live summary update
-const selectLab    = document.getElementById('selectLab');
-const inputTanggal = document.getElementById('inputTanggal');
-const inputMulai   = document.getElementById('inputMulai');
-const inputSelesai = document.getElementById('inputSelesai');
+const inputNamaLab = document.getElementById('inputNamaLab');
+const inputLokasi  = document.getElementById('inputLokasi');
+const inputKursi   = document.getElementById('inputKursi');
+const selectStatus = document.getElementById('selectStatus');
+const sumStatus    = document.getElementById('sumStatus');
 
 function updateSummary() {
-    const lab     = selectLab.value    || '—';
-    const tanggal = inputTanggal.value || '';
-    const mulai   = inputMulai.value   || '';
-    const selesai = inputSelesai.value || '';
+    document.getElementById('sumNama').textContent   = inputNamaLab.value || '—';
+    document.getElementById('sumLokasi').textContent = inputLokasi.value  || '—';
+    document.getElementById('sumKursi').textContent  = inputKursi.value   || '—';
 
-    document.getElementById('sumLab').textContent     = lab;
-    document.getElementById('sumTanggal').textContent = tanggal
-        ? new Date(tanggal).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })
-        : '—';
-    document.getElementById('sumWaktu').textContent   = (mulai && selesai)
-        ? mulai + ' – ' + selesai
-        : (mulai || '—');
+    if (selectStatus.value === 'availabel') {
+        sumStatus.textContent = 'Tersedia';
+        sumStatus.classList.remove('off');
+    } else {
+        sumStatus.textContent = 'Tidak Tersedia';
+        sumStatus.classList.add('off');
+    }
 }
 
-selectLab.addEventListener('change', updateSummary);
-inputTanggal.addEventListener('change', updateSummary);
-inputMulai.addEventListener('change', updateSummary);
-inputSelesai.addEventListener('change', updateSummary);
+inputNamaLab.addEventListener('input', updateSummary);
+inputLokasi.addEventListener('input', updateSummary);
+inputKursi.addEventListener('input', updateSummary);
+selectStatus.addEventListener('change', updateSummary);
 </script>
 
 </body>

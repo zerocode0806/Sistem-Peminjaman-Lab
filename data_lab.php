@@ -34,6 +34,10 @@ $query = mysqli_query($koneksi, "SELECT * FROM data_lab ORDER BY nama_lab ASC");
     --red-soft:   #FEF2F2;
     --green:      #16A34A;
     --green-soft: #F0FDF4;
+    --blue:       #2563EB;
+    --blue-soft:  #EFF6FF;
+    --amber:      #F59E0B;
+    --amber-soft: #FFFBEB;
     --sidebar-w:  228px;
     --radius:     10px;
 }
@@ -443,6 +447,45 @@ tbody td {
     min-width: 20px;
 }
 
+/* ── ACTION BUTTONS ── */
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-action {
+    width: 30px; height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+}
+
+.btn-action.btn-edit:hover {
+    background: var(--blue-soft);
+    color: var(--blue);
+    border-color: var(--blue);
+}
+
+.btn-action.btn-inventaris:hover {
+    background: var(--amber-soft);
+    color: var(--amber);
+    border-color: var(--amber);
+}
+
+.btn-action.btn-delete:hover {
+    background: var(--red-soft);
+    color: var(--red);
+    border-color: var(--red);
+}
+
 /* ── EMPTY STATE ── */
 .empty-state {
     text-align: center;
@@ -485,6 +528,7 @@ tbody td {
     .stok-bar-wrap .stok-bar { display: none; }
     thead th:nth-child(3),
     tbody td:nth-child(3) { display: none; }
+    .btn-action { width: 32px; height: 32px; }
 }
 </style>
 </head>
@@ -535,7 +579,7 @@ tbody td {
     <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
             <a class="nav-link" href="riwayat_pinjam.php">
-                <i class="bi bi-clock-history"></i> Riwayat
+                <i class="bi bi-clock-history"></i> Ongoing
             </a>
         </li>
         <li class="nav-item">
@@ -578,7 +622,7 @@ tbody td {
                 <i class="bi bi-search"></i>
                 <input type="text" class="search-input" id="searchInput" placeholder="Cari laboratorium…">
             </div>
-            <a href="?page=lab_tambah" class="btn-primary">
+            <a href="tambah_data_lab.php" class="btn-primary">
                 <i class="bi bi-plus"></i>
                 <span>Tambah Lab</span>
             </a>
@@ -603,6 +647,7 @@ tbody td {
                         <th>Laboratorium</th>
                         <th>Stok / Kuota</th>
                         <th>Status</th>
+                        <th style="width:110px">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -656,10 +701,27 @@ tbody td {
                                 <?= $statusText; ?>
                             </span>
                         </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="edit_data_lab.php?id=<?= urlencode($lab['id_lab']); ?>"
+                                   class="btn-action btn-edit" title="Edit Lab">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="inventaris_lab.php?id_lab=<?= urlencode($lab['id_lab']); ?>"
+                                   class="btn-action btn-inventaris" title="Inventaris Lab">
+                                    <i class="bi bi-box-seam"></i>
+                                </a>
+                                <a href="hapus_data_lab.php?id=<?= urlencode($lab['id_lab']); ?>"
+                                   class="btn-action btn-delete" title="Hapus Lab"
+                                   onclick="return confirm('Yakin ingin menghapus lab \'<?= htmlspecialchars(addslashes($lab['nama_lab'])); ?>\' beserta seluruh data inventarisnya? Tindakan ini tidak dapat dibatalkan.')">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
                     </tr>
                 <?php endwhile; else: ?>
                     <tr>
-                        <td colspan="4">
+                        <td colspan="5">
                             <div class="empty-state">
                                 <div class="empty-icon"><i class="bi bi-building"></i></div>
                                 <p>Data laboratorium belum tersedia.</p>

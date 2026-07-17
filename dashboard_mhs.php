@@ -562,14 +562,14 @@ tbody td:last-child { text-align: right; }
     <p class="nav-section">Peminjaman</p>
     <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
-            <a class="nav-link " href="dashboard_mhs.php">
+            <a class="nav-link " href="riwayat_pinjam_mhs.php">
                 <i class="bi bi-clock-history"></i> Ongoing
             </a>
         </li>
     </ul>
     <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
-            <a class="nav-link" href="riwayat_pinjam_mhs.php">
+            <a class="nav-link" href="arsip_peminjaman_mhs.php">
                 <i class="bi bi-archive-fill"></i> Riwayat Saya
             </a>
         </li>

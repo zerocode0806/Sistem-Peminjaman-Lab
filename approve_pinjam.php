@@ -31,6 +31,7 @@ $query = mysqli_query($koneksi, "
         p.jam_mulai,
         p.jam_selesai,
         p.status,
+        p.kursi,
 
         m.nama AS nama_mhs,
         m.no_telepon,
@@ -609,6 +610,10 @@ select:focus {
                 <div class="info-item">
                     <span class="info-label">Laboratorium</span>
                     <span class="info-value"><?= htmlspecialchars($data['nama_lab']) ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Meja</span>
+                    <span class="info-value"><?= htmlspecialchars($data['kursi']) ?></span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Tanggal</span>

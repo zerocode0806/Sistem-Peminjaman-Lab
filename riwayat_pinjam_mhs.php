@@ -5,23 +5,21 @@ include 'koneksi.php';
 /* ===============================
    CEK LOGIN ADMIN
 ================================ */
-if (!isset($_SESSION['mahasiswa'])) {
+if (!isset($_SESSION['user'])) {
     header('Location: index.php');
     exit;
 }
 
 /* ===============================
-   AMBIL DATA RIWAYAT PINJAM MAHASISWA
-   (status selesai diproses)
+   AMBIL DATA RIWAYAT PINJAM
 ================================ */
 $query = mysqli_query($koneksi, "
     SELECT *
     FROM data_pinjam
-    WHERE status IN ('selesai', 'ditolak') AND nim = '{$_SESSION['mahasiswa']['nim']}'
+    WHERE status IN ('disetujui') AND nim = '{$_SESSION['mahasiswa']['nim']}'
     ORDER BY tanggal DESC
 ");
 ?>
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -480,7 +478,7 @@ tbody td:last-child { text-align: right; }
         <div class="logo-icon"><i class="bi bi-boxes"></i></div>
         <div class="sidebar-logo-text">
             <strong>LabSystem</strong>
-            <span>Mahasiswa</span>
+            <span>Admin Panel</span>
         </div>
     </div>
 
@@ -491,21 +489,18 @@ tbody td:last-child { text-align: right; }
                 <i class="bi bi-grid-1x2"></i> Dashboard
             </a>
         </li>
-        
     </ul>
 
     <p class="nav-section">Peminjaman</p>
     <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
-            <a class="nav-link " href="dashboard_mhs.php">
+            <a class="nav-link active" href="riwayat_pinjam_mhs.php">
                 <i class="bi bi-clock-history"></i> Ongoing
             </a>
         </li>
-    </ul>
-    <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
-            <a class="nav-link active" href="riwayat_pinjam_mhs.php">
-                <i class="bi bi-archive-fill"></i> Riwayat Saya
+            <a class="nav-link" href="arsip_peminjaman_mhs.php">
+                <i class="bi bi-archive-fill"></i> Arsip
             </a>
         </li>
     </ul>
@@ -521,10 +516,10 @@ tbody td:last-child { text-align: right; }
     </ul>
 
     <div class="sidebar-user">
-        <div class="avatar"><?= strtoupper(substr($_SESSION['mahasiswa']['nama'], 0, 1)) ?></div>
+        <div class="avatar"><?= strtoupper(substr($_SESSION['user']['nama'], 0, 1)) ?></div>
         <div class="sidebar-user-info">
-            <strong><?= htmlspecialchars($_SESSION['mahasiswa']['nama']) ?></strong>
-            <span>Mahasiswa</span>
+            <strong><?= htmlspecialchars($_SESSION['user']['nama']) ?></strong>
+            <span>Administrator</span>
         </div>
     </div>
 </aside>

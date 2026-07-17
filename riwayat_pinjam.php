@@ -505,7 +505,7 @@ tbody td:last-child { text-align: right; }
     <ul style="list-style:none;padding:0;margin:0">
         <li class="nav-item">
             <a class="nav-link active" href="riwayat_pinjam.php">
-                <i class="bi bi-clock-history"></i> Riwayat
+                <i class="bi bi-clock-history"></i> Ongoing
             </a>
         </li>
         <li class="nav-item">
