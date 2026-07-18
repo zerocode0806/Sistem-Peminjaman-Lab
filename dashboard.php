@@ -656,7 +656,7 @@ tbody td:last-child { text-align: right; }
                 <thead>
                     <tr>
                         <th>Mahasiswa</th>
-                        <th>Laboratorium</th>
+                        <th>Laboratorium Atau Barang</th>
                         <th>Tanggal</th>
                         <th>Waktu</th>
                         <th>Status</th>
@@ -677,7 +677,6 @@ tbody td:last-child { text-align: right; }
                 ?>
                     <tr>
                         <td><span class="nim-text"><?= htmlspecialchars($row['nim']) ?></span></td>
-                        <td><?= htmlspecialchars($row['nama_lab']) ?></td>
                         <td><?= date('d M Y', strtotime($row['tanggal'])) ?></td>
                         <td>
                             <span class="time-range">

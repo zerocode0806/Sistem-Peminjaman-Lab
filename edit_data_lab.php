@@ -14,7 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nama_lab = mysqli_real_escape_string($koneksi, $_POST['nama_lab']);
     $lokasi   = mysqli_real_escape_string($koneksi, $_POST['lokasi']);
     $stok     = (int) $_POST['stok'];
-    $status   = $_POST['status'] === 'availabel' ? 'availabel' : 'unavailabel';
+    $status = $_POST['status'] === 'availabel'
+    ? 'availabel'
+    : 'not available';
 
     mysqli_query($koneksi, "UPDATE data_lab
         SET nama_lab = '$nama_lab', stok = '$stok', status = '$status', lokasi = '$lokasi'
@@ -104,8 +106,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
                 <div class="form-group">
                     <label>Status</label>
                     <select name="status" class="form-control">
-                        <option value="availabel" <?= $lab['status'] === 'availabel' ? 'selected' : ''; ?>>Tersedia</option>
-                        <option value="unavailabel" <?= $lab['status'] !== 'availabel' ? 'selected' : ''; ?>>Tidak Tersedia</option>
+                        <option value="availabel"
+                            <?= $lab['status'] === 'availabel' ? 'selected' : ''; ?>>
+                            Tersedia
+                        </option>
+
+                        <option value="not available"
+                            <?= $lab['status'] === 'not available' ? 'selected' : ''; ?>>
+                            Tidak Tersedia
+                        </option>
                     </select>
                 </div>
                 <div class="form-actions">

@@ -22,32 +22,40 @@ if ($id <= 0) {
 /* ===============================
    AMBIL DATA PINJAM + MAHASISWA
 ================================ */
-$query = mysqli_query($koneksi, "
-    SELECT 
+$stmt = mysqli_prepare($koneksi, "
+    SELECT
         p.id_data,
         p.nim,
+        p.jenis,
         p.nama_lab,
+        p.kursi,
+        p.id_barang,
+        p.nama_barang,
+        p.jumlah,
         p.tanggal,
         p.jam_mulai,
         p.jam_selesai,
         p.status,
-        p.kursi,
 
         m.nama AS nama_mhs,
         m.no_telepon,
         m.alamat
     FROM data_pinjam p
     JOIN mahasiswa m ON p.nim = m.nim
-    WHERE p.id_data = '$id'
+    WHERE p.id_data = ?
     LIMIT 1
 ");
-
-$data = mysqli_fetch_assoc($query);
+mysqli_stmt_bind_param($stmt, "i", $id);
+mysqli_stmt_execute($stmt);
+$data = mysqli_stmt_get_result($stmt)->fetch_assoc();
 
 if (!$data) {
     echo "<script>alert('Data tidak ditemukan'); window.location='dashboard.php';</script>";
     exit;
 }
+
+// Untuk data lama sebelum kolom 'jenis' ditambahkan, anggap sebagai peminjaman lab
+$jenis = $data['jenis'] ?: 'lab';
 
 /* ===============================
    UPDATE STATUS (WORKFLOW)
@@ -65,16 +73,44 @@ if (isset($_POST['update_status'])) {
         $allowed = ['selesai'];
     }
 
-    if (in_array($status_baru, $allowed)) {
+    if (in_array($status_baru, $allowed, true)) {
 
-        mysqli_query($koneksi, "
-            UPDATE data_pinjam
-            SET status = '$status_baru'
-            WHERE id_data = '$id'
-        ");
+        mysqli_begin_transaction($koneksi);
 
-        header("Location: dashboard.php?msg=success");
-        exit;
+        try {
+            $stmtUpdate = mysqli_prepare($koneksi, "UPDATE data_pinjam SET status = ? WHERE id_data = ?");
+            mysqli_stmt_bind_param($stmtUpdate, "si", $status_baru, $id);
+            if (!mysqli_stmt_execute($stmtUpdate)) {
+                throw new Exception("Gagal memperbarui status peminjaman.");
+            }
+
+            // Kembalikan stok jika peminjaman ditolak (tidak jadi dipakai)
+            // atau sudah selesai (barang/kursi kembali tersedia)
+            if (in_array($status_baru, ['ditolak', 'selesai'], true)) {
+                if ($jenis === 'barang' && $data['id_barang']) {
+                    $jumlahKembali = (int) $data['jumlah'];
+                    $stmtRestore = mysqli_prepare($koneksi, "UPDATE data_barang SET stok = stok + ? WHERE id_barang = ?");
+                    mysqli_stmt_bind_param($stmtRestore, "ii", $jumlahKembali, $data['id_barang']);
+                    if (!mysqli_stmt_execute($stmtRestore)) {
+                        throw new Exception("Gagal mengembalikan stok barang.");
+                    }
+                } elseif ($jenis === 'lab' && $data['nama_lab']) {
+                    $stmtRestore = mysqli_prepare($koneksi, "UPDATE data_lab SET stok = stok + 1 WHERE nama_lab = ?");
+                    mysqli_stmt_bind_param($stmtRestore, "s", $data['nama_lab']);
+                    if (!mysqli_stmt_execute($stmtRestore)) {
+                        throw new Exception("Gagal mengembalikan stok laboratorium.");
+                    }
+                }
+            }
+
+            mysqli_commit($koneksi);
+            header("Location: dashboard.php?msg=success");
+            exit;
+
+        } catch (Exception $e) {
+            mysqli_rollback($koneksi);
+            $error = $e->getMessage();
+        }
     }
 }
 ?>
@@ -110,6 +146,8 @@ if (isset($_POST['update_status'])) {
     --blue-soft:  #EFF4FF;
     --cyan:       #0891B2;
     --cyan-soft:  #ECFEFF;
+    --violet:     #7C3AED;
+    --violet-soft:#F5F3FF;
     --radius:     10px;
 }
 
@@ -147,12 +185,7 @@ body {
     color: var(--muted);
 }
 
-.breadcrumb-nav a {
-    color: var(--muted);
-    text-decoration: none;
-    transition: color .15s;
-}
-
+.breadcrumb-nav a { color: var(--muted); text-decoration: none; transition: color .15s; }
 .breadcrumb-nav a:hover { color: var(--text); }
 .breadcrumb-nav i { font-size: 11px; }
 .breadcrumb-nav .current { color: var(--text); font-weight: 500; }
@@ -176,7 +209,7 @@ body {
 
 .btn-back:hover { background: var(--bg); color: var(--text); }
 
-/* ── SUCCESS ALERT ── */
+/* ── ALERTS ── */
 .alert-success {
     display: flex;
     align-items: center;
@@ -190,8 +223,22 @@ body {
     color: var(--green);
     font-weight: 500;
 }
-
 .alert-success i { font-size: 16px; flex-shrink: 0; }
+
+.alert-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--red-soft);
+    border: 1px solid #FECACA;
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 13.5px;
+    color: var(--red);
+    font-weight: 500;
+}
+.alert-error i { font-size: 16px; flex-shrink: 0; }
 
 /* ── PAGE TITLE ROW ── */
 .page-title-row {
@@ -203,13 +250,10 @@ body {
     flex-wrap: wrap;
 }
 
-.page-title-row h1 {
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: -.3px;
-}
+.page-title-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.page-title-row h1 { font-size: 18px; font-weight: 600; letter-spacing: -.3px; }
 
-/* ── STATUS BADGE ── */
+/* ── BADGES ── */
 .badge {
     display: inline-flex;
     align-items: center;
@@ -221,12 +265,7 @@ body {
     white-space: nowrap;
 }
 
-.badge::before {
-    content: '';
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
+.badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
 .badge-menunggu  { background: var(--warn-soft);  color: var(--warn);  }
 .badge-menunggu::before  { background: var(--warn); }
@@ -238,6 +277,21 @@ body {
 .badge-selesai::before   { background: var(--cyan); }
 .badge-default   { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
 .badge-default::before   { background: var(--muted); }
+
+/* Jenis badge (Lab / Barang) — tanpa dot, pakai ikon */
+.badge-jenis {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 100px;
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.badge-jenis i { font-size: 12px; }
+.badge-jenis-lab    { background: var(--blue-soft);   color: var(--blue); }
+.badge-jenis-barang { background: var(--violet-soft); color: var(--violet); }
 
 /* ── GRID LAYOUT ── */
 .detail-grid {
@@ -274,11 +328,7 @@ body {
     flex-shrink: 0;
 }
 
-.card-header h2 {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--text);
-}
+.card-header h2 { font-size: 13.5px; font-weight: 600; color: var(--text); }
 
 /* ── INFO ROWS ── */
 .info-list { padding: 6px 0; }
@@ -301,15 +351,25 @@ body {
     color: var(--muted);
 }
 
-.info-value {
-    font-size: 13.5px;
-    font-weight: 500;
-    color: var(--text);
+.info-value { font-size: 13.5px; font-weight: 500; color: var(--text); }
+.info-value.mono { font-family: 'DM Mono', monospace; font-size: 13px; }
+
+.info-value-with-tag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
-.info-value.mono {
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
+.item-kategori-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: var(--violet-soft);
+    color: var(--violet);
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 500;
 }
 
 .time-range {
@@ -350,21 +410,11 @@ body {
     flex-shrink: 0;
 }
 
-.action-card-header h2 {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--text);
-}
-
+.action-card-header h2 { font-size: 13.5px; font-weight: 600; color: var(--text); }
 .action-card-body { padding: 20px; }
 
 /* Workflow steps */
-.workflow {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    margin-bottom: 24px;
-}
+.workflow { display: flex; align-items: center; gap: 0; margin-bottom: 24px; }
 
 .workflow-step {
     display: flex;
@@ -403,50 +453,17 @@ body {
     transition: all .2s;
 }
 
-.workflow-step.done .step-dot {
-    background: var(--green);
-    border-color: var(--green);
-    color: #fff;
-}
+.workflow-step.done .step-dot { background: var(--green); border-color: var(--green); color: #fff; }
+.workflow-step.current .step-dot { background: var(--warn); border-color: var(--warn); color: #fff; box-shadow: 0 0 0 4px var(--warn-soft); }
+.workflow-step.rejected .step-dot { background: var(--red); border-color: var(--red); color: #fff; }
+.workflow-step.finished .step-dot { background: var(--cyan); border-color: var(--cyan); color: #fff; }
 
-.workflow-step.current .step-dot {
-    background: var(--warn);
-    border-color: var(--warn);
-    color: #fff;
-    box-shadow: 0 0 0 4px var(--warn-soft);
-}
-
-.workflow-step.rejected .step-dot {
-    background: var(--red);
-    border-color: var(--red);
-    color: #fff;
-}
-
-.workflow-step.finished .step-dot {
-    background: var(--cyan);
-    border-color: var(--cyan);
-    color: #fff;
-}
-
-.step-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--muted);
-    text-align: center;
-    white-space: nowrap;
-}
-
+.step-label { font-size: 11px; font-weight: 500; color: var(--muted); text-align: center; white-space: nowrap; }
 .workflow-step.done .step-label,
 .workflow-step.current .step-label { color: var(--text); font-weight: 600; }
 
 /* Select + button form */
-.action-form {
-    display: flex;
-    gap: 10px;
-    align-items: flex-end;
-    flex-wrap: wrap;
-}
-
+.action-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .form-group { flex: 1; min-width: 160px; }
 
 .form-group label {
@@ -516,7 +533,6 @@ select:focus {
     font-size: 13px;
     color: var(--muted);
 }
-
 .status-locked i { font-size: 15px; flex-shrink: 0; }
 
 /* ── RESPONSIVE ── */
@@ -554,9 +570,23 @@ select:focus {
     </div>
     <?php endif; ?>
 
-    <!-- Page Title + Current Status -->
+    <?php if (isset($error)): ?>
+    <div class="alert-error">
+        <i class="bi bi-exclamation-circle-fill"></i>
+        <?= htmlspecialchars($error) ?>
+    </div>
+    <?php endif; ?>
+
+    <!-- Page Title + Jenis + Current Status -->
     <div class="page-title-row">
-        <h1>Detail Peminjaman</h1>
+        <div class="page-title-left">
+            <h1>Detail Peminjaman</h1>
+            <?php if ($jenis === 'barang'): ?>
+                <span class="badge-jenis badge-jenis-barang"><i class="bi bi-box-seam-fill"></i> Barang / Alat</span>
+            <?php else: ?>
+                <span class="badge-jenis badge-jenis-lab"><i class="bi bi-building"></i> Ruang Lab</span>
+            <?php endif; ?>
+        </div>
         <?php
         $badgeClass = match($data['status']) {
             'menunggu'  => 'badge-menunggu',
@@ -603,18 +633,44 @@ select:focus {
         <!-- Peminjaman -->
         <div class="card">
             <div class="card-header">
-                <div class="card-header-icon"><i class="bi bi-building"></i></div>
-                <h2>Detail Peminjaman</h2>
+                <div class="card-header-icon">
+                    <i class="<?= $jenis === 'barang' ? 'bi bi-box-seam' : 'bi bi-building' ?>"></i>
+                </div>
+                <h2><?= $jenis === 'barang' ? 'Detail Barang Dipinjam' : 'Detail Ruang Lab' ?></h2>
             </div>
             <div class="info-list">
-                <div class="info-item">
-                    <span class="info-label">Laboratorium</span>
-                    <span class="info-value"><?= htmlspecialchars($data['nama_lab']) ?></span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Meja</span>
-                    <span class="info-value"><?= htmlspecialchars($data['kursi']) ?></span>
-                </div>
+
+                <?php if ($jenis === 'barang'): ?>
+
+                    <div class="info-item">
+                        <span class="info-label">Barang</span>
+                        <span class="info-value"><?= htmlspecialchars($data['nama_barang'] ?? '—') ?></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Jumlah</span>
+                        <span class="info-value"><?= (int)($data['jumlah'] ?? 0) ?> unit</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Lab Asal Barang</span>
+                        <span class="info-value info-value-with-tag">
+                            <?= htmlspecialchars($data['nama_lab']) ?>
+                            <span class="item-kategori-tag"><i class="bi bi-geo-alt"></i></span>
+                        </span>
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="info-item">
+                        <span class="info-label">Laboratorium</span>
+                        <span class="info-value"><?= htmlspecialchars($data['nama_lab']) ?></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Kursi</span>
+                        <span class="info-value"><?= htmlspecialchars($data['kursi']) ?></span>
+                    </div>
+
+                <?php endif; ?>
+
                 <div class="info-item">
                     <span class="info-label">Tanggal</span>
                     <span class="info-value mono"><?= date('d M Y', strtotime($data['tanggal'])) ?></span>

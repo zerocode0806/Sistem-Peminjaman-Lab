@@ -15,13 +15,11 @@ $nim = $_SESSION['mahasiswa']['nim'];
 /* ===============================
    AMBIL DATA MAHASISWA
 ================================ */
-$mhsQuery = mysqli_query($koneksi, "
-    SELECT nama, no_telepon, alamat
-    FROM mahasiswa
-    WHERE nim = '$nim'
-");
+$stmtMhs = mysqli_prepare($koneksi, "SELECT nama, no_telepon, alamat FROM mahasiswa WHERE nim = ?");
+mysqli_stmt_bind_param($stmtMhs, "s", $nim);
+mysqli_stmt_execute($stmtMhs);
+$dataMhs = mysqli_stmt_get_result($stmtMhs)->fetch_assoc();
 
-$dataMhs = mysqli_fetch_assoc($mhsQuery);
 if (!$dataMhs) {
     die("Data mahasiswa tidak ditemukan.");
 }
@@ -32,22 +30,46 @@ if (!$dataMhs) {
 $labQuery = mysqli_query($koneksi, "
     SELECT nama_lab, stok
     FROM data_lab
-    WHERE status = 'availabel'
+    WHERE status = 'availabel' AND stok > 0
     ORDER BY nama_lab ASC
 ");
 
 $labsData = [];
 while ($lab = mysqli_fetch_assoc($labQuery)) {
     $labsData[] = [
-        'nama_lab'     => $lab['nama_lab'],
-        'stok' => (int) $lab['stok'],
+        'nama_lab' => $lab['nama_lab'],
+        'stok'     => (int) $lab['stok'],
     ];
 }
 
-/* Map nama_lab => jumlah_kursi untuk dipakai di JavaScript */
 $labsMapJs = [];
 foreach ($labsData as $l) {
     $labsMapJs[$l['nama_lab']] = $l['stok'];
+}
+
+/* ===============================
+   AMBIL BARANG TERSEDIA
+================================ */
+$barangQuery = mysqli_query($koneksi, "
+    SELECT b.id_barang, b.nama_barang, b.kode_barang, b.stok, l.nama_lab
+    FROM data_barang b
+    JOIN data_lab l ON b.id_lab = l.id_lab
+    WHERE b.status = 'availabel' AND b.stok > 0
+    ORDER BY b.nama_barang ASC
+");
+
+$barangData = [];
+while ($b = mysqli_fetch_assoc($barangQuery)) {
+    $barangData[] = $b;
+}
+
+$barangMapJs = [];
+foreach ($barangData as $b) {
+    $barangMapJs[$b['id_barang']] = [
+        'stok'     => (int) $b['stok'],
+        'nama'     => $b['nama_barang'],
+        'nama_lab' => $b['nama_lab'],
+    ];
 }
 
 /* ===============================
@@ -55,63 +77,151 @@ foreach ($labsData as $l) {
 ================================ */
 if (isset($_POST['simpan'])) {
 
-    $nama_lab    = mysqli_real_escape_string($koneksi, $_POST['nama_lab']);
-    $tanggal     = $_POST['tanggal'];
-    $jam_mulai   = $_POST['jam_mulai'];
-    $jam_selesai = $_POST['jam_selesai'];
-    $kursi       = (int) ($_POST['kursi'] ?? 0);
+    $jenis       = $_POST['jenis'] ?? 'lab';
+    $tanggal     = $_POST['tanggal'] ?? '';
+    $jam_mulai   = $_POST['jam_mulai'] ?? '';
+    $jam_selesai = $_POST['jam_selesai'] ?? '';
     $status      = 'menunggu';
 
-    if ($jam_selesai <= $jam_mulai) {
+    if ($tanggal === '' || $jam_mulai === '' || $jam_selesai === '') {
+        $error = "Tanggal dan jam wajib diisi.";
+    } elseif ($jam_selesai <= $jam_mulai) {
         $error = "Jam selesai harus lebih besar dari jam mulai";
-    } elseif ($kursi <= 0) {
-        $error = "Silakan pilih kursi terlebih dahulu.";
-    } else {
-        // Mulai transaksi
-        mysqli_begin_transaction($koneksi);
+    } elseif ($jenis === 'lab') {
 
-        try {
+        $nama_lab = trim($_POST['nama_lab'] ?? '');
+        $kursi    = (int) ($_POST['kursi'] ?? 0);
 
-            // 🔎 Kunci & cek apakah kursi ini sudah dipesan pada rentang waktu yang sama
-            $cekKursi = mysqli_query($koneksi, "
-                SELECT id_data
-                FROM data_pinjam
-                WHERE nama_lab   = '$nama_lab'
-                  AND tanggal    = '$tanggal'
-                  AND kursi      = '$kursi'
-                  AND status IN ('menunggu', 'disetujui')
-                  AND jam_mulai   < '$jam_selesai'
-                  AND jam_selesai > '$jam_mulai'
-                FOR UPDATE
-            ");
+        if ($nama_lab === '') {
+            $error = "Silakan pilih laboratorium terlebih dahulu.";
+        } elseif ($kursi <= 0) {
+            $error = "Silakan pilih kursi terlebih dahulu.";
+        } else {
 
-            if ($cekKursi && mysqli_num_rows($cekKursi) > 0) {
-                throw new Exception("Kursi tersebut sudah dipesan pada rentang waktu yang dipilih.");
+            mysqli_begin_transaction($koneksi);
+
+            try {
+                // Kunci baris lab yang dipilih & cek stok tersisa
+                $stmtLabLock = mysqli_prepare($koneksi, "SELECT stok FROM data_lab WHERE nama_lab = ? FOR UPDATE");
+                mysqli_stmt_bind_param($stmtLabLock, "s", $nama_lab);
+                mysqli_stmt_execute($stmtLabLock);
+                $rowLab = mysqli_stmt_get_result($stmtLabLock)->fetch_assoc();
+
+                if (!$rowLab || (int)$rowLab['stok'] <= 0) {
+                    throw new Exception("Stok laboratorium ini sudah habis.");
+                }
+
+                // Cek apakah kursi ini sudah dipesan pada rentang waktu yang sama
+                $stmtCekKursi = mysqli_prepare($koneksi, "
+                    SELECT id_data
+                    FROM data_pinjam
+                    WHERE jenis        = 'lab'
+                      AND nama_lab     = ?
+                      AND tanggal      = ?
+                      AND kursi        = ?
+                      AND status IN ('menunggu', 'disetujui')
+                      AND jam_mulai    < ?
+                      AND jam_selesai  > ?
+                    FOR UPDATE
+                ");
+                mysqli_stmt_bind_param($stmtCekKursi, "ssiss", $nama_lab, $tanggal, $kursi, $jam_selesai, $jam_mulai);
+                mysqli_stmt_execute($stmtCekKursi);
+                $cekKursi = mysqli_stmt_get_result($stmtCekKursi);
+
+                if ($cekKursi && mysqli_num_rows($cekKursi) > 0) {
+                    throw new Exception("Kursi tersebut sudah dipesan pada rentang waktu yang dipilih.");
+                }
+
+                // Insert data peminjaman
+                $stmtInsert = mysqli_prepare($koneksi, "
+                    INSERT INTO data_pinjam (nim, jenis, nama_lab, kursi, tanggal, jam_mulai, jam_selesai, status)
+                    VALUES (?, 'lab', ?, ?, ?, ?, ?, ?)
+                ");
+                mysqli_stmt_bind_param($stmtInsert, "ssissss", $nim, $nama_lab, $kursi, $tanggal, $jam_mulai, $jam_selesai, $status);
+                if (!mysqli_stmt_execute($stmtInsert)) {
+                    throw new Exception("Gagal menyimpan data peminjaman.");
+                }
+
+                // Kurangi stok lab sebanyak 1
+                $stmtDec = mysqli_prepare($koneksi, "UPDATE data_lab SET stok = stok - 1 WHERE nama_lab = ? AND stok > 0");
+                mysqli_stmt_bind_param($stmtDec, "s", $nama_lab);
+                if (!mysqli_stmt_execute($stmtDec) || mysqli_stmt_affected_rows($stmtDec) === 0) {
+                    throw new Exception("Gagal memperbarui stok laboratorium.");
+                }
+
+                mysqli_commit($koneksi);
+                header("Location: dashboard_mhs.php?msg=success");
+                exit;
+
+            } catch (Exception $e) {
+                mysqli_rollback($koneksi);
+                $error = $e->getMessage();
             }
-
-            // ✅ Insert data peminjaman
-            $insert = mysqli_query($koneksi, "
-            INSERT INTO data_pinjam
-            (nim, nama_lab, kursi, tanggal, jam_mulai, jam_selesai, status)
-            VALUES
-            ('$nim', '$nama_lab', '$kursi', '$tanggal', '$jam_mulai', '$jam_selesai', '$status')
-            ");
-
-            if (!$insert) {
-                throw new Exception("Gagal menyimpan data peminjaman.");
-            }
-
-            // Commit jika semua berhasil
-            mysqli_commit($koneksi);
-
-            header("Location: dashboard_mhs.php?msg=success");
-            exit;
-
-        } catch (Exception $e) {
-
-            mysqli_rollback($koneksi);
-            $error = $e->getMessage();
         }
+
+    } elseif ($jenis === 'barang') {
+
+        $id_barang = (int) ($_POST['id_barang'] ?? 0);
+        $jumlah    = (int) ($_POST['jumlah'] ?? 0);
+
+        if ($id_barang <= 0) {
+            $error = "Silakan pilih barang terlebih dahulu.";
+        } elseif ($jumlah <= 0) {
+            $error = "Jumlah barang harus lebih dari 0.";
+        } else {
+
+            mysqli_begin_transaction($koneksi);
+
+            try {
+                // Kunci baris barang yang dipilih & cek stok tersisa
+                $stmtBrgLock = mysqli_prepare($koneksi, "
+                    SELECT b.stok, b.nama_barang, l.nama_lab
+                    FROM data_barang b
+                    JOIN data_lab l ON b.id_lab = l.id_lab
+                    WHERE b.id_barang = ?
+                    FOR UPDATE
+                ");
+                mysqli_stmt_bind_param($stmtBrgLock, "i", $id_barang);
+                mysqli_stmt_execute($stmtBrgLock);
+                $rowBrg = mysqli_stmt_get_result($stmtBrgLock)->fetch_assoc();
+
+                if (!$rowBrg) {
+                    throw new Exception("Barang tidak ditemukan.");
+                }
+                if ((int)$rowBrg['stok'] < $jumlah) {
+                    throw new Exception("Stok barang tidak mencukupi. Sisa stok: " . (int)$rowBrg['stok']);
+                }
+
+                // Insert data peminjaman
+                $stmtInsert = mysqli_prepare($koneksi, "
+                    INSERT INTO data_pinjam (nim, jenis, nama_lab, id_barang, nama_barang, jumlah, tanggal, jam_mulai, jam_selesai, status)
+                    VALUES (?, 'barang', ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                mysqli_stmt_bind_param($stmtInsert, "ssisissss",
+                    $nim, $rowBrg['nama_lab'], $id_barang, $rowBrg['nama_barang'], $jumlah, $tanggal, $jam_mulai, $jam_selesai, $status);
+                if (!mysqli_stmt_execute($stmtInsert)) {
+                    throw new Exception("Gagal menyimpan data peminjaman.");
+                }
+
+                // Kurangi stok barang sebanyak jumlah yang dipinjam
+                $stmtDec = mysqli_prepare($koneksi, "UPDATE data_barang SET stok = stok - ? WHERE id_barang = ? AND stok >= ?");
+                mysqli_stmt_bind_param($stmtDec, "iii", $jumlah, $id_barang, $jumlah);
+                if (!mysqli_stmt_execute($stmtDec) || mysqli_stmt_affected_rows($stmtDec) === 0) {
+                    throw new Exception("Gagal memperbarui stok barang.");
+                }
+
+                mysqli_commit($koneksi);
+                header("Location: dashboard_mhs.php?msg=success");
+                exit;
+
+            } catch (Exception $e) {
+                mysqli_rollback($koneksi);
+                $error = $e->getMessage();
+            }
+        }
+
+    } else {
+        $error = "Jenis peminjaman tidak valid.";
     }
 }
 ?>
@@ -145,6 +255,8 @@ if (isset($_POST['simpan'])) {
     --warn-soft:  #FFFBEB;
     --blue:       #2563EB;
     --blue-soft:  #EFF4FF;
+    --violet:     #7C3AED;
+    --violet-soft:#F5F3FF;
     --radius:     10px;
 }
 
@@ -221,17 +333,8 @@ body {
 .btn-back:hover { background: var(--bg); color: var(--text); }
 
 /* ── PAGE HEADER ── */
-.page-header {
-    margin-bottom: 24px;
-}
-
-.page-header h1 {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -.3px;
-    margin-bottom: 3px;
-}
-
+.page-header { margin-bottom: 24px; }
+.page-header h1 { font-size: 20px; font-weight: 600; letter-spacing: -.3px; margin-bottom: 3px; }
 .page-header p { font-size: 13px; color: var(--muted); }
 
 /* ── ERROR ALERT ── */
@@ -288,26 +391,12 @@ body {
     flex-shrink: 0;
 }
 
-.card-header h2 {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--text);
-}
-
-.card-header-hint {
-    margin-left: auto;
-    font-size: 11px;
-    color: var(--muted);
-}
-
+.card-header h2 { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.card-header-hint { margin-left: auto; font-size: 11px; color: var(--muted); }
 .card-body { padding: 20px; }
 
 /* ── READONLY PROFILE GRID ── */
-.profile-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-}
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
 
 .profile-field {
     padding: 12px 16px;
@@ -329,27 +418,48 @@ body {
     color: var(--muted);
 }
 
-.field-value {
-    font-size: 13.5px;
-    font-weight: 500;
-    color: var(--text);
+.field-value { font-size: 13.5px; font-weight: 500; color: var(--text); }
+.field-value.mono { font-family: 'DM Mono', monospace; font-size: 13px; }
+
+/* ── SEGMENTED TOGGLE (Jenis Peminjaman) ── */
+.segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 18px;
 }
 
-.field-value.mono {
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
+.segmented-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 9px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+    user-select: none;
+}
+
+.segmented-btn i { font-size: 15px; }
+
+.segmented-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
 }
 
 /* ── FORM ELEMENTS ── */
 .form-group { margin-bottom: 16px; }
 .form-group:last-child { margin-bottom: 0; }
 
-.form-row {
-    display: grid;
-    gap: 14px;
-    margin-bottom: 16px;
-}
-
+.form-row { display: grid; gap: 14px; margin-bottom: 16px; }
 .form-row-2 { grid-template-columns: 1fr 1fr; }
 
 label {
@@ -364,6 +474,7 @@ label {
 
 input[type="date"],
 input[type="time"],
+input[type="number"],
 select {
     width: 100%;
     padding: 9px 12px;
@@ -381,6 +492,7 @@ select {
 
 input[type="date"]:focus,
 input[type="time"]:focus,
+input[type="number"]:focus,
 select:focus {
     border-color: var(--accent);
     background: var(--surface);
@@ -395,11 +507,9 @@ select {
     cursor: pointer;
 }
 
-.section-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 18px 0;
-}
+.section-divider { height: 1px; background: var(--border); margin: 18px 0; }
+.stok-hint { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.stok-hint.warn { color: var(--warn); }
 
 /* ── SEAT MAP ── */
 .seat-empty-hint {
@@ -413,11 +523,7 @@ select {
 
 .seat-map-wrap { padding: 22px 20px 20px; }
 
-.admin-desk {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 26px;
-}
+.admin-desk { display: flex; justify-content: center; margin-bottom: 26px; }
 
 .admin-desk-label {
     display: inline-flex;
@@ -474,32 +580,11 @@ select {
     flex-shrink: 0;
 }
 
-.seat:hover:not(.taken) {
-    border-color: var(--accent);
-    color: var(--text);
-    transform: translateY(-1px);
-}
+.seat:hover:not(.taken) { border-color: var(--accent); color: var(--text); transform: translateY(-1px); }
+.seat.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+.seat.taken { background: var(--red-soft); border-color: #FECACA; color: var(--red); cursor: not-allowed; opacity: .75; }
 
-.seat.selected {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-}
-
-.seat.taken {
-    background: var(--red-soft);
-    border-color: #FECACA;
-    color: var(--red);
-    cursor: not-allowed;
-    opacity: .75;
-}
-
-.seat-loading {
-    text-align: center;
-    font-size: 12.5px;
-    color: var(--muted);
-    margin-bottom: 14px;
-}
+.seat-loading { text-align: center; font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
 
 .seat-legend {
     display: flex;
@@ -510,25 +595,47 @@ select {
     border-top: 1px solid var(--border);
 }
 
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 11.5px;
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); }
+
+.legend-dot { width: 15px; height: 15px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
+.legend-dot.selected { background: var(--accent); border-color: var(--accent); }
+.legend-dot.taken { background: var(--red-soft); border-color: #FECACA; }
+
+/* ── BARANG PICKER ── */
+.barang-empty-hint {
+    padding: 30px 20px;
+    text-align: center;
+    font-size: 13px;
     color: var(--muted);
 }
+.barang-empty-hint i { display: block; font-size: 20px; margin-bottom: 8px; color: var(--border); }
 
-.legend-dot {
-    width: 15px;
-    height: 15px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--bg);
+.barang-picker { padding: 20px; }
+
+.barang-info-card {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--violet-soft);
+    border: 1px solid #DDD6FE;
+    border-radius: 8px;
+    margin-top: 14px;
+}
+
+.barang-info-icon {
+    width: 34px; height: 34px;
+    background: var(--violet);
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 15px;
     flex-shrink: 0;
 }
 
-.legend-dot.selected { background: var(--accent); border-color: var(--accent); }
-.legend-dot.taken { background: var(--red-soft); border-color: #FECACA; }
+.barang-info-text strong { display: block; font-size: 13px; color: var(--text); }
+.barang-info-text span { font-size: 11.5px; color: var(--muted); }
 
 /* ── SUMMARY CARD ── */
 .summary-card {
@@ -540,42 +647,14 @@ select {
     top: 24px;
 }
 
-.summary-header {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-}
-
+.summary-header { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--text); }
 .summary-body { padding: 18px; }
 
-.summary-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
+.summary-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
 .summary-row:last-child { margin-bottom: 0; }
 
-.summary-key {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--muted);
-    flex-shrink: 0;
-}
-
-.summary-val {
-    font-size: 12.5px;
-    font-weight: 500;
-    color: var(--text);
-    text-align: right;
-    font-family: 'DM Mono', monospace;
-    word-break: break-all;
-}
-
+.summary-key { font-size: 12px; font-weight: 500; color: var(--muted); flex-shrink: 0; }
+.summary-val { font-size: 12.5px; font-weight: 500; color: var(--text); text-align: right; font-family: 'DM Mono', monospace; word-break: break-all; }
 .summary-val.seat-picked { color: var(--accent); font-weight: 600; }
 
 .summary-divider { height: 1px; background: var(--border); margin: 14px 0; }
@@ -592,13 +671,7 @@ select {
     border-radius: 100px;
 }
 
-.summary-status::before {
-    content: '';
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    background: var(--warn);
-    flex-shrink: 0;
-}
+.summary-status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--warn); flex-shrink: 0; }
 
 /* ── STUDENT PILL ── */
 .student-pill {
@@ -625,18 +698,8 @@ select {
     color: #fff;
 }
 
-.student-info strong {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-}
-
-.student-info span {
-    font-family: 'DM Mono', monospace;
-    font-size: 11.5px;
-    color: var(--muted);
-}
+.student-info strong { display: block; font-size: 13px; font-weight: 600; color: var(--text); }
+.student-info span { font-family: 'DM Mono', monospace; font-size: 11.5px; color: var(--muted); }
 
 /* ── ACTION BUTTONS ── */
 .form-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
@@ -697,6 +760,7 @@ select {
     .form-row-2 { grid-template-columns: 1fr; }
     .top-nav { flex-direction: column; align-items: flex-start; }
     .seat { width: 34px; height: 34px; font-size: 11px; }
+    .segmented { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -721,7 +785,7 @@ select {
     <!-- Page Header -->
     <div class="page-header">
         <h1>Ajukan Peminjaman</h1>
-        <p>Isi formulir berikut untuk mengajukan peminjaman laboratorium</p>
+        <p>Isi formulir berikut untuk mengajukan peminjaman laboratorium atau barang</p>
     </div>
 
     <?php if (isset($error)): ?>
@@ -761,32 +825,62 @@ select {
                         <span class="field-value"><?= htmlspecialchars($dataMhs['alamat']) ?></span>
                     </div>
                 </div>
-
-                <!-- Hidden inputs to pass data (matching original form fields) -->
-                <input type="hidden" name="nama" value="<?= htmlspecialchars($dataMhs['nama']) ?>">
-                <input type="hidden" name="nim_val" value="<?= htmlspecialchars($nim) ?>">
-                <input type="hidden" name="no_telepon" value="<?= htmlspecialchars($dataMhs['no_telepon']) ?>">
-                <input type="hidden" name="alamat" value="<?= htmlspecialchars($dataMhs['alamat']) ?>">
             </div>
 
             <!-- Card: Detail Peminjaman -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-header-icon"><i class="bi bi-building"></i></div>
+                    <div class="card-header-icon"><i class="bi bi-clipboard-check"></i></div>
                     <h2>Detail Peminjaman</h2>
                 </div>
                 <div class="card-body">
 
-                    <div class="form-group">
+                    <label>Jenis Peminjaman</label>
+                    <div class="segmented">
+                        <div class="segmented-btn active" data-jenis="lab" id="btnJenisLab">
+                            <i class="bi bi-building"></i> Ruang Lab
+                        </div>
+                        <div class="segmented-btn" data-jenis="barang" id="btnJenisBarang">
+                            <i class="bi bi-box-seam"></i> Barang / Alat
+                        </div>
+                    </div>
+                    <input type="hidden" name="jenis" id="inputJenis" value="lab">
+
+                    <div class="section-divider"></div>
+
+                    <!-- Lab select (hanya untuk jenis = lab) -->
+                    <div class="form-group" id="labSelectGroup">
                         <label>Laboratorium</label>
-                        <select name="nama_lab" id="selectLab" required>
+                        <select name="nama_lab" id="selectLab">
                             <option value="">— Pilih Laboratorium —</option>
                             <?php foreach ($labsData as $lab): ?>
                                 <option value="<?= htmlspecialchars($lab['nama_lab']) ?>">
-                                    <?= htmlspecialchars($lab['nama_lab']) ?> (<?= $lab['stok'] ?> kursi)
+                                    <?= htmlspecialchars($lab['nama_lab']) ?> (<?= $lab['stok'] ?> kursi tersisa)
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+
+                    <!-- Barang select (hanya untuk jenis = barang) -->
+                    <div class="form-group" id="barangSelectGroup" style="display:none">
+                        <label>Barang / Alat</label>
+                        <select name="id_barang" id="selectBarang">
+                            <option value="">— Pilih Barang —</option>
+                            <?php foreach ($barangData as $b): ?>
+                                <option value="<?= (int)$b['id_barang'] ?>">
+                                    <?= htmlspecialchars($b['nama_barang']) ?> — <?= htmlspecialchars($b['nama_lab']) ?> (stok: <?= (int)$b['stok'] ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if (empty($barangData)): ?>
+                            <p class="stok-hint warn">Belum ada barang yang tersedia untuk dipinjam saat ini.</p>
+                        <?php endif; ?>
+
+                        <div class="form-group" style="margin-top:14px;margin-bottom:0">
+                            <label>Jumlah</label>
+                            <input type="number" name="jumlah" id="inputJumlah" min="1" value="1">
+                            <p class="stok-hint" id="jumlahHint"></p>
+                        </div>
                     </div>
 
                     <div class="section-divider"></div>
@@ -812,8 +906,8 @@ select {
                 </div>
             </div>
 
-            <!-- Card: Pilih Kursi -->
-            <div class="card">
+            <!-- Card: Pilih Kursi (hanya jenis = lab) -->
+            <div class="card" id="cardKursi">
                 <div class="card-header">
                     <div class="card-header-icon"><i class="bi bi-grid-3x3-gap-fill"></i></div>
                     <h2>Pilih Kursi</h2>
@@ -826,24 +920,40 @@ select {
                 </div>
 
                 <div id="seatCardBody" class="seat-map-wrap" style="display:none">
-
                     <div class="admin-desk">
                         <span class="admin-desk-label"><i class="bi bi-display"></i> Meja Admin</span>
                     </div>
-
                     <div id="seatLoading" class="seat-loading" style="display:none">Memeriksa ketersediaan kursi…</div>
-
                     <div id="seatRows" class="seat-rows"></div>
-
                     <div class="seat-legend">
                         <div class="legend-item"><span class="legend-dot"></span> Tersedia</div>
                         <div class="legend-item"><span class="legend-dot selected"></span> Dipilih</div>
                         <div class="legend-item"><span class="legend-dot taken"></span> Sudah dipesan</div>
                     </div>
-
                 </div>
 
                 <input type="hidden" name="kursi" id="inputKursiPilih" value="">
+            </div>
+
+            <!-- Card: Info Barang (hanya jenis = barang) -->
+            <div class="card" id="cardBarangInfo" style="display:none">
+                <div class="card-header">
+                    <div class="card-header-icon"><i class="bi bi-info-circle"></i></div>
+                    <h2>Info Barang</h2>
+                </div>
+                <div id="barangEmptyHint" class="barang-empty-hint">
+                    <i class="bi bi-cursor"></i>
+                    Pilih barang terlebih dahulu untuk melihat detailnya
+                </div>
+                <div class="barang-picker" id="barangPickerBody" style="display:none">
+                    <div class="barang-info-card" id="barangInfoCard">
+                        <div class="barang-info-icon"><i class="bi bi-box-seam-fill"></i></div>
+                        <div class="barang-info-text">
+                            <strong id="barangInfoNama">—</strong>
+                            <span id="barangInfoLab">—</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -854,7 +964,6 @@ select {
                 <div class="summary-header">Ringkasan Pengajuan</div>
                 <div class="summary-body">
 
-                    <!-- Student pill -->
                     <div class="student-pill">
                         <div class="student-avatar"><?= strtoupper(substr($dataMhs['nama'], 0, 1)) ?></div>
                         <div class="student-info">
@@ -871,8 +980,20 @@ select {
                     <div class="summary-divider"></div>
 
                     <div class="summary-row">
+                        <span class="summary-key">Jenis</span>
+                        <span class="summary-val" id="sumJenis">Ruang Lab</span>
+                    </div>
+                    <div class="summary-row" id="rowSumLab">
                         <span class="summary-key">Lab</span>
                         <span class="summary-val" id="sumLab">—</span>
+                    </div>
+                    <div class="summary-row" id="rowSumBarang" style="display:none">
+                        <span class="summary-key">Barang</span>
+                        <span class="summary-val" id="sumBarang">—</span>
+                    </div>
+                    <div class="summary-row" id="rowSumJumlah" style="display:none">
+                        <span class="summary-key">Jumlah</span>
+                        <span class="summary-val" id="sumJumlah">—</span>
                     </div>
                     <div class="summary-row">
                         <span class="summary-key">Tanggal</span>
@@ -882,7 +1003,7 @@ select {
                         <span class="summary-key">Waktu</span>
                         <span class="summary-val" id="sumWaktu">—</span>
                     </div>
-                    <div class="summary-row">
+                    <div class="summary-row" id="rowSumKursi">
                         <span class="summary-key">Kursi</span>
                         <span class="summary-val" id="sumKursi">—</span>
                     </div>
@@ -906,13 +1027,29 @@ select {
 </div>
 
 <script>
-/* Data jumlah kursi per lab, dikirim dari PHP */
-const labsData = <?= json_encode($labsMapJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+/* Data dari PHP */
+const labsData   = <?= json_encode($labsMapJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const barangData = <?= json_encode($barangMapJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+/* Elemen umum */
+const inputJenis     = document.getElementById('inputJenis');
+const btnJenisLab     = document.getElementById('btnJenisLab');
+const btnJenisBarang  = document.getElementById('btnJenisBarang');
+
+const labSelectGroup    = document.getElementById('labSelectGroup');
+const barangSelectGroup = document.getElementById('barangSelectGroup');
+const cardKursi         = document.getElementById('cardKursi');
+const cardBarangInfo    = document.getElementById('cardBarangInfo');
 
 const selectLab      = document.getElementById('selectLab');
+const selectBarang    = document.getElementById('selectBarang');
+const inputJumlah     = document.getElementById('inputJumlah');
+const jumlahHint       = document.getElementById('jumlahHint');
+
 const inputTanggal   = document.getElementById('inputTanggal');
 const inputMulai     = document.getElementById('inputMulai');
 const inputSelesai   = document.getElementById('inputSelesai');
+
 const seatEmptyHint  = document.getElementById('seatEmptyHint');
 const seatCardBody   = document.getElementById('seatCardBody');
 const seatRows       = document.getElementById('seatRows');
@@ -920,16 +1057,53 @@ const seatLoading    = document.getElementById('seatLoading');
 const seatCountHint  = document.getElementById('seatCountHint');
 const inputKursiPilih = document.getElementById('inputKursiPilih');
 
+const barangEmptyHint  = document.getElementById('barangEmptyHint');
+const barangPickerBody = document.getElementById('barangPickerBody');
+const barangInfoNama   = document.getElementById('barangInfoNama');
+const barangInfoLab    = document.getElementById('barangInfoLab');
+
+const rowSumLab    = document.getElementById('rowSumLab');
+const rowSumKursi  = document.getElementById('rowSumKursi');
+const rowSumBarang = document.getElementById('rowSumBarang');
+const rowSumJumlah = document.getElementById('rowSumJumlah');
+
 let selectedSeat = null;
 let fetchToken   = 0;
+let currentJenis = 'lab';
 
-/* Render denah kursi: nomor 1 di kanan (dekat meja admin), membesar ke kiri,
-   lalu berlanjut ke baris berikutnya jika jumlah kursi melebihi 1 baris. */
+/* ===== Toggle Jenis Peminjaman ===== */
+function setJenis(jenis) {
+    currentJenis = jenis;
+    inputJenis.value = jenis;
+
+    btnJenisLab.classList.toggle('active', jenis === 'lab');
+    btnJenisBarang.classList.toggle('active', jenis === 'barang');
+
+    const isLab = jenis === 'lab';
+
+    labSelectGroup.style.display    = isLab ? 'block' : 'none';
+    barangSelectGroup.style.display = isLab ? 'none'  : 'block';
+    cardKursi.style.display         = isLab ? 'block' : 'none';
+    cardBarangInfo.style.display    = isLab ? 'none'  : 'block';
+
+    document.getElementById('sumJenis').textContent = isLab ? 'Ruang Lab' : 'Barang / Alat';
+    rowSumLab.style.display    = isLab ? 'flex' : 'none';
+    rowSumKursi.style.display  = isLab ? 'flex' : 'none';
+    rowSumBarang.style.display = isLab ? 'none' : 'flex';
+    rowSumJumlah.style.display = isLab ? 'none' : 'flex';
+
+    updateSummary();
+}
+
+btnJenisLab.addEventListener('click', () => setJenis('lab'));
+btnJenisBarang.addEventListener('click', () => setJenis('barang'));
+
+/* ===== Seat map (jenis = lab) ===== */
 function renderSeats(total, bookedSeats) {
     seatRows.innerHTML = '';
     selectedSeat = null;
     inputKursiPilih.value = '';
-    updateSeatSummary();
+    updateSummary();
 
     seatCountHint.textContent = total ? total + ' kursi' : '';
 
@@ -961,21 +1135,9 @@ function selectSeat(num, el) {
     el.classList.add('selected');
     selectedSeat = num;
     inputKursiPilih.value = num;
-    updateSeatSummary();
+    updateSummary();
 }
 
-function updateSeatSummary() {
-    const el = document.getElementById('sumKursi');
-    if (selectedSeat) {
-        el.textContent = 'Kursi ' + selectedSeat;
-        el.classList.add('seat-picked');
-    } else {
-        el.textContent = '—';
-        el.classList.remove('seat-picked');
-    }
-}
-
-/* Ambil daftar kursi yang sudah dipesan untuk lab + tanggal + jam terpilih */
 function loadBookedSeats() {
     const lab   = selectLab.value;
     const total = labsData[lab] || 0;
@@ -993,7 +1155,6 @@ function loadBookedSeats() {
     const mulai   = inputMulai.value;
     const selesai = inputSelesai.value;
 
-    // Jika tanggal/jam belum lengkap, tampilkan semua kursi sebagai tersedia
     if (!tanggal || !mulai || !selesai) {
         renderSeats(total, []);
         return;
@@ -1008,7 +1169,7 @@ function loadBookedSeats() {
     fetch('cek_kursi.php?' + params.toString())
         .then(res => res.json())
         .then(data => {
-            if (token !== fetchToken) return; // hasil fetch lama, abaikan
+            if (token !== fetchToken) return;
             seatLoading.style.display = 'none';
             renderSeats(total, data.booked || []);
         })
@@ -1019,33 +1180,100 @@ function loadBookedSeats() {
         });
 }
 
-/* Live summary */
+/* ===== Barang picker (jenis = barang) ===== */
+function updateBarangInfo() {
+    const id = selectBarang.value;
+
+    if (!id || !barangData[id]) {
+        barangEmptyHint.style.display  = 'block';
+        barangPickerBody.style.display = 'none';
+        inputJumlah.removeAttribute('max');
+        jumlahHint.textContent = '';
+        return;
+    }
+
+    const item = barangData[id];
+    barangEmptyHint.style.display  = 'none';
+    barangPickerBody.style.display = 'block';
+
+    barangInfoNama.textContent = item.nama;
+    barangInfoLab.textContent  = 'Lab: ' + item.nama_lab + ' · Stok tersedia: ' + item.stok;
+
+    inputJumlah.setAttribute('max', item.stok);
+    if (parseInt(inputJumlah.value || '1', 10) > item.stok) {
+        inputJumlah.value = item.stok;
+    }
+    jumlahHint.textContent = 'Maksimal ' + item.stok + ' unit.';
+
+    updateSummary();
+}
+
+/* ===== Live summary ===== */
 function updateSummary() {
-    const lab     = selectLab.value || '—';
     const tanggal = inputTanggal.value || '';
     const mulai   = inputMulai.value   || '';
     const selesai = inputSelesai.value || '';
 
-    document.getElementById('sumLab').textContent = lab;
     document.getElementById('sumTanggal').textContent = tanggal
         ? new Date(tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
         : '—';
     document.getElementById('sumWaktu').textContent = mulai && selesai
         ? mulai + ' – ' + selesai
         : mulai || '—';
+
+    if (currentJenis === 'lab') {
+        document.getElementById('sumLab').textContent = selectLab.value || '—';
+        const seatEl = document.getElementById('sumKursi');
+        if (selectedSeat) {
+            seatEl.textContent = 'Kursi ' + selectedSeat;
+            seatEl.classList.add('seat-picked');
+        } else {
+            seatEl.textContent = '—';
+            seatEl.classList.remove('seat-picked');
+        }
+    } else {
+        const id = selectBarang.value;
+        document.getElementById('sumBarang').textContent = (id && barangData[id]) ? barangData[id].nama : '—';
+        document.getElementById('sumJumlah').textContent = inputJumlah.value ? inputJumlah.value + ' unit' : '—';
+    }
 }
 
 selectLab.addEventListener('change', () => { loadBookedSeats(); updateSummary(); });
+selectBarang.addEventListener('change', () => { updateBarangInfo(); });
+inputJumlah.addEventListener('input', () => { updateSummary(); });
 inputTanggal.addEventListener('change', () => { loadBookedSeats(); updateSummary(); });
 inputMulai.addEventListener('change', () => { loadBookedSeats(); updateSummary(); });
 inputSelesai.addEventListener('change', () => { loadBookedSeats(); updateSummary(); });
 
 document.getElementById('loanForm').addEventListener('submit', function (e) {
-    if (!selectedSeat) {
-        e.preventDefault();
-        alert('Silakan pilih kursi terlebih dahulu.');
+    if (currentJenis === 'lab') {
+        if (!selectLab.value) {
+            e.preventDefault();
+            alert('Silakan pilih laboratorium terlebih dahulu.');
+            return;
+        }
+        if (!selectedSeat) {
+            e.preventDefault();
+            alert('Silakan pilih kursi terlebih dahulu.');
+            return;
+        }
+    } else {
+        if (!selectBarang.value) {
+            e.preventDefault();
+            alert('Silakan pilih barang terlebih dahulu.');
+            return;
+        }
+        if (!inputJumlah.value || parseInt(inputJumlah.value, 10) <= 0) {
+            e.preventDefault();
+            alert('Jumlah barang harus lebih dari 0.');
+            return;
+        }
     }
 });
+
+/* Init */
+setJenis('lab');
+updateSummary();
 </script>
 
 </body>

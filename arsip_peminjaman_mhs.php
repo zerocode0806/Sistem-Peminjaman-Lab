@@ -599,7 +599,7 @@ tbody td:last-child { text-align: right; }
                             </span>
                         </td>
                         <td>
-                            <a href="detail_pinjam.php?id=<?= $row['id_data'] ?>" class="btn-detail">
+                            <a href="detail_pinjam_mhs.php?id=<?= $row['id_data'] ?>" class="btn-detail">
                                 <i class="bi bi-arrow-right"></i> Detail
                             </a>
                         </td>
