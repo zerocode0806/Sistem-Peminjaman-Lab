@@ -8,66 +8,65 @@ $successSignup = '';
 $activeForm    = 'login';
 
 /* ===============================
-   LOGIN MAHASISWA
+   LOGIN
 ================================ */
 if (isset($_POST['login'])) {
     $activeForm = 'login';
 
-    $nim      = trim($_POST['nim'] ?? '');
+    $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if ($nim === '' || $password === '') {
-        $errorLogin = "NIM dan password wajib diisi!";
+    if ($username === '' || $password === '') {
+        $errorLogin = "Username dan password wajib diisi.";
     } else {
-        $stmt = mysqli_prepare($koneksi, "SELECT * FROM mahasiswa WHERE nim = ?");
-        mysqli_stmt_bind_param($stmt, "s", $nim);
+        $stmt = mysqli_prepare($koneksi, "SELECT id_admin, nama, email, username, password FROM admin WHERE username = ?");
+        mysqli_stmt_bind_param($stmt, "s", $username);
         mysqli_stmt_execute($stmt);
-        $mhs = mysqli_stmt_get_result($stmt)->fetch_assoc();
+        $user = mysqli_stmt_get_result($stmt)->fetch_assoc();
 
-        if ($mhs && password_verify($password, $mhs['password'])) {
-            unset($mhs['password']);
-            $_SESSION['mahasiswa'] = $mhs;
-            header("Location: dashboard_mhs.php");
+        if ($user && password_verify($password, $user['password'])) {
+            unset($user['password']);
+            $_SESSION['user'] = $user;
+            header('Location: dashboard.php');
             exit;
         } else {
-            $errorLogin = "NIM atau password salah!";
+            $errorLogin = "Username atau password salah!";
         }
     }
 }
 
 /* ===============================
-   SIGNUP MAHASISWA
+   SIGNUP
 ================================ */
 if (isset($_POST['signup'])) {
     $activeForm = 'signup';
 
     $nama       = trim($_POST['nama'] ?? '');
-    $nim        = trim($_POST['nim'] ?? '');
-    $telepon    = trim($_POST['telepon'] ?? '');
-    $alamat     = trim($_POST['alamat'] ?? '');
+    $email      = trim($_POST['email'] ?? '');
+    $username   = trim($_POST['username'] ?? '');
     $password   = $_POST['password'] ?? '';
     $konfirmasi = $_POST['confirm_password'] ?? '';
 
-    if ($nama === '' || $nim === '' || $telepon === '' || $alamat === '' || $password === '') {
+    if ($nama === '' || $email === '' || $username === '' || $password === '') {
         $errorSignup = "Semua kolom wajib diisi.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errorSignup = "Format email tidak valid.";
     } elseif (strlen($password) < 6) {
         $errorSignup = "Password minimal 6 karakter.";
     } elseif ($password !== $konfirmasi) {
         $errorSignup = "Konfirmasi password tidak cocok.";
     } else {
-        $stmtCek = mysqli_prepare($koneksi, "SELECT nim FROM mahasiswa WHERE nim = ?");
-        mysqli_stmt_bind_param($stmtCek, "s", $nim);
+        // Cek username / email sudah dipakai atau belum
+        $stmtCek = mysqli_prepare($koneksi, "SELECT id_admin FROM admin WHERE username = ? OR email = ? LIMIT 1");
+        mysqli_stmt_bind_param($stmtCek, "ss", $username, $email);
         mysqli_stmt_execute($stmtCek);
 
         if (mysqli_stmt_get_result($stmtCek)->fetch_assoc()) {
-            $errorSignup = "NIM sudah digunakan!";
+            $errorSignup = "Username atau email sudah digunakan!";
         } else {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $stmtInsert = mysqli_prepare($koneksi, "
-                INSERT INTO mahasiswa (nama, nim, no_telepon, alamat, password)
-                VALUES (?, ?, ?, ?, ?)
-            ");
-            mysqli_stmt_bind_param($stmtInsert, "sssss", $nama, $nim, $telepon, $alamat, $hashed);
+            $stmtInsert = mysqli_prepare($koneksi, "INSERT INTO admin (nama, email, username, password) VALUES (?, ?, ?, ?)");
+            mysqli_stmt_bind_param($stmtInsert, "ssss", $nama, $email, $username, $hashed);
 
             if (mysqli_stmt_execute($stmtInsert)) {
                 $successSignup = "Pendaftaran berhasil! Silakan masuk.";
@@ -84,7 +83,7 @@ if (isset($_POST['signup'])) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Masuk Mahasiswa – LabSystem</title>
+<title>Masuk Admin – LabSystem</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -122,7 +121,7 @@ body {
 }
 
 /* ── PAGE ── */
-.auth-page { width: 100%; max-width: 420px; }
+.auth-page { width: 100%; max-width: 400px; }
 
 /* ── BRAND ── */
 .brand {
@@ -230,8 +229,6 @@ body {
 .field-group { margin-bottom: 16px; }
 .field-group:last-of-type { margin-bottom: 0; }
 
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
 label {
     display: block;
     font-size: 12.5px;
@@ -241,7 +238,7 @@ label {
 }
 
 input[type="text"],
-input[type="tel"],
+input[type="email"],
 input[type="password"] {
     width: 100%;
     padding: 10px 12px;
@@ -262,6 +259,7 @@ input:focus {
 }
 
 .password-wrap { position: relative; }
+
 .password-wrap input { padding-right: 40px; }
 
 .toggle-eye {
@@ -280,6 +278,8 @@ input:focus {
 }
 .toggle-eye:hover { background: var(--bg); color: var(--text); }
 .toggle-eye i { font-size: 14px; }
+
+.hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
 
 /* ── BUTTON ── */
 .btn-submit {
@@ -326,7 +326,6 @@ input:focus {
 
 @media (max-width: 420px) {
     .card { padding: 20px; }
-    .field-row { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -342,7 +341,7 @@ input:focus {
         <div class="brand-icon"><i class="bi bi-boxes"></i></div>
         <div class="brand-text">
             <strong>LabSystem</strong>
-            <span>Portal Mahasiswa</span>
+            <span>Admin Panel</span>
         </div>
     </div>
 
@@ -359,7 +358,7 @@ input:focus {
     <div class="card <?= $activeForm === 'login' ? '' : 'hidden' ?>" id="loginForm">
         <div class="card-header">
             <h1>Masuk</h1>
-            <p>Gunakan akun mahasiswa Anda</p>
+            <p>Gunakan akun admin Anda</p>
         </div>
 
         <?php if ($successSignup): ?>
@@ -378,8 +377,8 @@ input:focus {
 
         <form method="POST">
             <div class="field-group">
-                <label for="loginNim">NIM</label>
-                <input type="text" id="loginNim" name="nim" placeholder="Masukkan NIM" inputmode="numeric" required>
+                <label for="loginUsername">Username</label>
+                <input type="text" id="loginUsername" name="username" placeholder="Masukkan username" required>
             </div>
             <div class="field-group">
                 <label for="loginPassword">Password</label>
@@ -402,7 +401,7 @@ input:focus {
     <div class="card <?= $activeForm === 'signup' ? '' : 'hidden' ?>" id="signupForm">
         <div class="card-header">
             <h1>Daftar</h1>
-            <p>Buat akun mahasiswa baru</p>
+            <p>Buat akun admin baru</p>
         </div>
 
         <?php if ($errorSignup): ?>
@@ -418,26 +417,16 @@ input:focus {
                 <input type="text" id="signupNama" name="nama" placeholder="Nama lengkap"
                        value="<?= htmlspecialchars($_POST['nama'] ?? '') ?>" required>
             </div>
-
-            <div class="field-row">
-                <div class="field-group">
-                    <label for="signupNim">NIM</label>
-                    <input type="text" id="signupNim" name="nim" placeholder="Nomor Induk Mahasiswa" inputmode="numeric"
-                           value="<?= htmlspecialchars($_POST['nim'] ?? '') ?>" required>
-                </div>
-                <div class="field-group">
-                    <label for="signupTelepon">No Telepon</label>
-                    <input type="tel" id="signupTelepon" name="telepon" placeholder="08xxxxxxxxxx"
-                           value="<?= htmlspecialchars($_POST['telepon'] ?? '') ?>" required>
-                </div>
-            </div>
-
             <div class="field-group">
-                <label for="signupAlamat">Alamat</label>
-                <input type="text" id="signupAlamat" name="alamat" placeholder="Alamat tempat tinggal"
-                       value="<?= htmlspecialchars($_POST['alamat'] ?? '') ?>" required>
+                <label for="signupEmail">Email</label>
+                <input type="email" id="signupEmail" name="email" placeholder="nama@contoh.com"
+                       value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
             </div>
-
+            <div class="field-group">
+                <label for="signupUsername">Username</label>
+                <input type="text" id="signupUsername" name="username" placeholder="Username untuk login"
+                       value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" required>
+            </div>
             <div class="field-group">
                 <label for="signupPassword">Password</label>
                 <div class="password-wrap">

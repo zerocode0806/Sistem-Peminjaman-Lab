@@ -550,52 +550,66 @@ tbody td:last-child { text-align: right; }
     </div>
 
     <p class="nav-section">Menu</p>
-    <ul style="list-style:none;padding:0;margin:0">
-        <li class="nav-item">
-            <a class="nav-link active" href="index.php">
-                <i class="bi bi-grid-1x2"></i> Dashboard
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="data_lab.php">
-                <i class="bi bi-building-fill"></i> Laboratorium
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="data_barang.php">
-                <i class="bi bi-box-seam-fill"></i> Data Barang
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="data_mhs.php">
-                <i class="bi bi-people-fill"></i> Mahasiswa
-            </a>
-        </li>
-    </ul>
+        <ul style="list-style:none;padding:0;margin:0">
+            <li class="nav-item">
+                <a class="nav-link active" href="dashboard.php">
+                    <i class="bi bi-grid-1x2"></i> Dashboard
+                </a>
+            </li>
+        </ul>
 
-    <p class="nav-section">Peminjaman</p>
-    <ul style="list-style:none;padding:0;margin:0">
-        <li class="nav-item">
-            <a class="nav-link" href="riwayat_pinjam.php">
-                <i class="bi bi-clock-history"></i> Ongoing
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="arsip_peminjaman.php">
-                <i class="bi bi-archive-fill"></i> Arsip
-            </a>
-        </li>
-    </ul>
+        <p class="nav-section">Aset</p>
+        <ul style="list-style:none;padding:0;margin:0">
+            <li class="nav-item">
+                <a class="nav-link" href="data_lab.php">
+                    <i class="bi bi-building-fill"></i> Laboratorium
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="data_barang.php">
+                    <i class="bi bi-box-seam-fill"></i> Data Barang
+                </a>
+            </li>
+        </ul>
 
-    <div style="flex:1"></div>
+        <p class="nav-section">Peminjaman</p>
+        <ul style="list-style:none;padding:0;margin:0">
+            <li class="nav-item">
+                <a class="nav-link" href="riwayat_pinjam.php">
+                    <i class="bi bi-clock-history"></i> Ongoing
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="arsip_peminjaman.php">
+                    <i class="bi bi-archive-fill"></i> Arsip
+                </a>
+            </li>
+        </ul>
 
-    <ul style="list-style:none;padding:0;margin:0 0 12px">
-        <li class="nav-item">
-            <a class="nav-link danger" href="logout.php" onclick="return confirm('Yakin ingin logout?')">
-                <i class="bi bi-box-arrow-right"></i> Logout
-            </a>
-        </li>
-    </ul>
+        <p class="nav-section">Pengguna</p>
+        <ul style="list-style:none;padding:0;margin:0">
+            <li class="nav-item">
+                <a class="nav-link" href="data_mhs.php">
+                    <i class="bi bi-people-fill"></i> Mahasiswa
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="data_admin.php">
+                    <i class="bi bi-person-badge-fill"></i> Admin
+                </a>
+            </li>
+        </ul>
+
+        <div style="flex:1"></div>
+
+        <ul style="list-style:none;padding:0;margin:0 0 12px">
+            <li class="nav-item">
+                <a class="nav-link danger" href="logout.php" onclick="return confirm('Yakin ingin logout?')">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+            </li>
+        </ul>
+
 
     <div class="sidebar-user">
         <div class="avatar"><?= strtoupper(substr($_SESSION['user']['nama'], 0, 1)) ?></div>
@@ -645,10 +659,10 @@ tbody td:last-child { text-align: right; }
                 <h2>Permintaan Menunggu Persetujuan</h2>
                 <span>Daftar peminjaman dengan status menunggu</span>
             </div>
-            <a href="tambah_data_pinjam.php" class="btn-primary">
+            <!-- <a href="tambah_data_pinjam.php" class="btn-primary">
                 <i class="bi bi-plus"></i>
                 <span>Tambah Peminjaman</span>
-            </a>
+            </a> -->
         </div>
 
         <div class="table-wrap">

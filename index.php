@@ -1,320 +1,217 @@
 <?php
 session_start();
-include 'koneksi.php';
 
-// LOGIN
-if (isset($_POST['login'])) {
-  $username = mysqli_real_escape_string($koneksi, $_POST['username']);
-  $password = mysqli_real_escape_string($koneksi, $_POST['password']);
-
-  $query = mysqli_query($koneksi, "SELECT * FROM admin WHERE username='$username' AND password='$password'");
-  $user = mysqli_fetch_assoc($query);
-
-  if ($user) {
-    $_SESSION['user'] = $user;
+// Kalau sudah login, langsung arahkan ke dashboard masing-masing
+if (isset($_SESSION['user'])) {
     header('Location: dashboard.php');
     exit;
-  } else {
-    $error = "Username atau password salah!";
-  }
 }
-
-// SIGNUP
-if (isset($_POST['signup'])) {
-  $nama = mysqli_real_escape_string($koneksi, $_POST['nama']);
-  $email = mysqli_real_escape_string($koneksi, $_POST['email']);
-  $username = mysqli_real_escape_string($koneksi, $_POST['username']);
-  $password = mysqli_real_escape_string($koneksi, $_POST['password']);
-
-  // Cek username sudah dipakai atau belum
-  $cek = mysqli_query($koneksi, "SELECT * FROM user WHERE usernama='$username'");
-  if (mysqli_num_rows($cek) > 0) {
-    $error = "Username sudah digunakan!";
-  } else {
-    mysqli_query($koneksi, "INSERT INTO user (nama, usernama, password, level) VALUES ('$nama', '$username', '$password', 'user')");
-    $success = "Pendaftaran berhasil! Silakan login.";
-  }
+if (isset($_SESSION['mahasiswa'])) {
+    header('Location: dashboard_mhs.php');
+    exit;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login & Signup</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-  <style>
-    :root {
-      --primary: #4f46e5;
-      --success: #16a34a;
-      --danger: #ef4444;
-      --text: #1e293b;
-      --muted: #6b7280;
-      --bg: #f5f7fa;
-      --card: #ffffff;
-      --radius: 12px;
-      --shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LabSystem – Pilih Akun</title>
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: "Inter", sans-serif;
-    }
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 
-    body {
-      background: var(--bg);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      color: var(--text);
-    }
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    .auth-card {
-      width: 100%;
-      max-width: 400px;
-      background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 2rem;
-      animation: fadeIn 0.3s ease-in-out;
-    }
+:root {
+    --bg:         #F7F7F5;
+    --surface:    #FFFFFF;
+    --border:     #E8E8E3;
+    --text:       #18181B;
+    --muted:      #8C8C8A;
+    --accent:     #1A1A1A;
+    --blue:       #2563EB;
+    --blue-soft:  #EFF4FF;
+    --violet:     #7C3AED;
+    --violet-soft:#F5F3FF;
+    --radius:     10px;
+}
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
 
-    .auth-header {
-      text-align: center;
-      margin-bottom: 1.75rem;
-    }
+.landing-page { width: 100%; max-width: 760px; }
 
-    .auth-title {
-      font-weight: 700;
-      font-size: 1.5rem;
-      margin-bottom: 0.25rem;
-      color: var(--text);
-    }
+/* ── BRAND ── */
+.brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
 
-    .auth-subtitle {
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
+.brand-icon {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
 
-    .form-group {
-      margin-bottom: 1rem;
-    }
+.brand-icon i { color: #fff; font-size: 19px; }
 
-    .form-label {
-      display: block;
-      font-size: 0.85rem;
-      font-weight: 600;
-      margin-bottom: 0.4rem;
-      color: var(--text);
-    }
+.brand-text strong { display: block; font-size: 17px; font-weight: 600; color: var(--text); }
+.brand-text span { font-size: 12px; color: var(--muted); }
 
-    .form-control {
-      width: 100%;
-      padding: 0.65rem 0.9rem;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      background: #fff;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
+/* ── INTRO ── */
+.intro {
+    text-align: center;
+    margin-bottom: 36px;
+}
 
-    .form-control:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-    }
+.intro h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -.3px;
+    margin-bottom: 6px;
+}
 
-    .btn {
-      width: 100%;
-      padding: 0.7rem;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
+.intro p { font-size: 13.5px; color: var(--muted); }
 
-    .btn-primary {
-      background: var(--primary);
-      color: #fff;
-    }
+/* ── ROLE CARDS ── */
+.role-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
 
-    .btn-primary:hover {
-      background: #4338ca;
-      transform: translateY(-1px);
-    }
+.role-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    text-decoration: none;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    transition: border-color .18s, transform .18s, box-shadow .18s;
+}
 
-    .auth-switch {
-      text-align: center;
-      margin-top: 1.25rem;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
+.role-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,.06);
+}
 
-    .auth-switch a {
-      color: var(--primary);
-      text-decoration: none;
-      font-weight: 600;
-      margin-left: 0.25rem;
-    }
+.role-icon {
+    width: 46px; height: 46px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    font-size: 21px;
+    flex-shrink: 0;
+}
 
-    .auth-switch a:hover {
-      text-decoration: underline;
-    }
+.role-icon.mhs    { background: var(--blue-soft);   color: var(--blue); }
+.role-icon.admin  { background: var(--violet-soft); color: var(--violet); }
 
-    .password-toggle {
-      position: relative;
-    }
+.role-card h2 {
+    font-size: 15.5px;
+    font-weight: 600;
+    color: var(--text);
+}
 
-    .password-toggle .toggle-btn {
-      position: absolute;
-      right: 0.75rem;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      color: var(--muted);
-      cursor: pointer;
-      padding: 0.25rem;
-    }
+.role-card p {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+}
 
-    .toggle-btn i {
-      font-size: 1rem;
-    }
+.role-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: auto;
+    padding-top: 6px;
+}
 
-    .hidden {
-      display: none;
-    }
+.role-cta i { font-size: 12px; transition: transform .18s; }
+.role-card:hover .role-cta i { transform: translateX(3px); }
 
-    @media (max-width: 576px) {
-      .auth-card {
-        padding: 1.5rem;
-      }
+/* ── FOOTER NOTE ── */
+.footer-note {
+    text-align: center;
+    margin-top: 28px;
+    font-size: 12px;
+    color: var(--muted);
+}
 
-      .auth-title {
-        font-size: 1.25rem;
-      }
-    }
-  </style>
+@media (max-width: 560px) {
+    .role-grid { grid-template-columns: 1fr; }
+    .intro h1 { font-size: 19px; }
+}
+</style>
 </head>
 <body>
-  <div class="auth-card" id="loginForm">
-    <div class="auth-header">
-      <h1 class="auth-title">Masuk</h1>
-      <p class="auth-subtitle">Gunakan akun Anda</p>
-    </div>
-    <form method="POST">
-        <div class="form-group">
-            <label class="form-label">Username</label>
-            <input type="text" name="username" class="form-control" placeholder="Masukkan username" required />
+
+<div class="landing-page">
+
+    <div class="brand">
+        <div class="brand-icon"><i class="bi bi-boxes"></i></div>
+        <div class="brand-text">
+            <strong>LabSystem</strong>
+            <span>Sistem Peminjaman Laboratorium</span>
         </div>
-        <div class="form-group">
-            <label class="form-label">Password</label>
-            <div class="password-toggle">
-            <input type="password" id="loginPassword" name="password" class="form-control" placeholder="••••••••" required />
-            <button type="button" class="toggle-btn" onclick="togglePassword('loginPassword', this)">
-                <i class="fa-solid fa-eye"></i>
-            </button>
+    </div>
+
+    <div class="intro">
+        <h1>Selamat datang</h1>
+        <p>Pilih jenis akun untuk melanjutkan</p>
+    </div>
+
+    <div class="role-grid">
+        <a href="login_mhs.php" class="role-card">
+            <div class="role-icon mhs"><i class="bi bi-mortarboard-fill"></i></div>
+            <div>
+                <h2>Mahasiswa</h2>
+                <p>Ajukan peminjaman ruang laboratorium atau barang/alat, dan pantau status pengajuan Anda.</p>
             </div>
-        </div>
-        <button type="submit" name="login" class="btn btn-primary">Masuk</button>
-        </form>
+            <span class="role-cta">Masuk sebagai Mahasiswa <i class="bi bi-arrow-right"></i></span>
+        </a>
 
-    <div class="auth-switch">
-      Belum punya akun?
-      <a href="#" onclick="showSignup()">Daftar</a>
-    </div>
-  </div>
-
-  <div class="auth-card hidden" id="signupForm">
-    <div class="auth-header">
-      <h1 class="auth-title">Daftar</h1>
-      <p class="auth-subtitle">Buat akun baru</p>
-    </div>
-    <form method="POST">
-        <div class="form-group">
-            <label class="form-label">Nama Lengkap</label>
-            <input type="text" name="nama" class="form-control" required />
-        </div>
-        <div class="form-group">
-            <label class="form-label">Email</label>
-            <input type="email" name="email" class="form-control" required />
-        </div>
-        <div class="form-group">
-            <label class="form-label">Username</label>
-            <input type="text" name="username" class="form-control" required />
-        </div>
-        <div class="form-group">
-            <label class="form-label">Password</label>
-            <div class="password-toggle">
-            <input type="password" name="password" id="signupPassword" class="form-control" required minlength="6" />
-            <button type="button" class="toggle-btn" onclick="togglePassword('signupPassword', this)">
-                <i class="fa-solid fa-eye"></i>
-            </button>
+        <a href="login_admin.php" class="role-card">
+            <div class="role-icon admin"><i class="bi bi-shield-lock-fill"></i></div>
+            <div>
+                <h2>Admin</h2>
+                <p>Kelola data laboratorium, barang, mahasiswa, dan proses persetujuan peminjaman.</p>
             </div>
-        </div>
-        <button type="submit" name="signup" class="btn btn-primary">Daftar</button>
-        </form>
-
-    <div class="auth-switch">
-      Sudah punya akun?
-      <a href="#" onclick="showLogin()">Masuk</a>
+            <span class="role-cta">Masuk sebagai Admin <i class="bi bi-arrow-right"></i></span>
+        </a>
     </div>
-  </div>
 
-  <script>
-    function showSignup() {
-      document.getElementById("loginForm").classList.add("hidden");
-      document.getElementById("signupForm").classList.remove("hidden");
-    }
+    <p class="footer-note">Belum punya akun? Pilih peran di atas — halaman masuk juga menyediakan opsi pendaftaran.</p>
 
-    function showLogin() {
-      document.getElementById("signupForm").classList.add("hidden");
-      document.getElementById("loginForm").classList.remove("hidden");
-    }
+</div>
 
-    function togglePassword(id, btn) {
-      const input = document.getElementById(id);
-      const icon = btn.querySelector("i");
-      if (input.type === "password") {
-        input.type = "text";
-        icon.classList.remove("fa-eye");
-        icon.classList.add("fa-eye-slash");
-      } else {
-        input.type = "password";
-        icon.classList.remove("fa-eye-slash");
-        icon.classList.add("fa-eye");
-      }
-    }
-
-    function handleLogin(e) {
-      e.preventDefault();
-      alert("Login berhasil! (Demo)");
-    }
-
-    function handleSignup(e) {
-      e.preventDefault();
-      const pass = document.getElementById("signupPassword").value;
-      const confirm = document.getElementById("confirmPassword").value;
-      if (pass !== confirm) {
-        alert("Password tidak cocok!");
-        return;
-      }
-      alert("Pendaftaran berhasil! (Demo)");
-      showLogin();
-    }
-  </script>
 </body>
 </html>
