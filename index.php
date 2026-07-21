@@ -3,11 +3,11 @@ session_start();
 
 // Kalau sudah login, langsung arahkan ke dashboard masing-masing
 if (isset($_SESSION['user'])) {
-    header('Location: dashboard.php');
+    header('Location: admin/dashboard.php');
     exit;
 }
 if (isset($_SESSION['mahasiswa'])) {
-    header('Location: dashboard_mhs.php');
+    header('Location: mahasiswa/dashboard_mhs.php');
     exit;
 }
 ?>
@@ -484,7 +484,7 @@ body {
             </div>
 
             <div class="role-grid">
-                <a href="login_mhs.php" class="role-card mhs">
+                <a href="auth/login_mhs.php" class="role-card mhs">
                     <div class="role-icon mhs"><i class="bi bi-mortarboard-fill"></i></div>
                     <div>
                         <h2>Mahasiswa</h2>
@@ -493,7 +493,7 @@ body {
                     <span class="role-cta">Masuk sebagai Mahasiswa <i class="bi bi-arrow-right"></i></span>
                 </a>
 
-                <a href="login_admin.php" class="role-card admin">
+                <a href="auth/login_admin.php" class="role-card admin">
                     <div class="role-icon admin"><i class="bi bi-shield-lock-fill"></i></div>
                     <div>
                         <h2>Admin</h2>
