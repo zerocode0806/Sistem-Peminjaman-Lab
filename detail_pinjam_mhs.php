@@ -5,7 +5,7 @@ include 'koneksi.php';
 /* ===============================
    CEK LOGIN ADMIN
 ================================ */
-if (!isset($_SESSION['user'])) {
+if (!isset($_SESSION['mahasiswa'])) {
     header('Location: index.php');
     exit;
 }
