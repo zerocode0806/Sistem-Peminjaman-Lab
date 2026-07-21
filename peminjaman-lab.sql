@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Jul 17, 2026 at 12:00 PM
+-- Generation Time: Jul 21, 2026 at 03:53 AM
 -- Server version: 8.4.3
 -- PHP Version: 8.3.30
 
@@ -40,8 +40,10 @@ CREATE TABLE `admin` (
 --
 
 INSERT INTO `admin` (`id_admin`, `nama`, `email`, `username`, `password`) VALUES
-(1, 'M Uabidilla Dahlan', 'dahlanubed@gmail.com', 'ubeddahlan', 'krian123'),
-(2, 'Amelia Nur Aini', 'amelia@gmail.com', 'amelia', 'ameliacantik');
+(3, 'M Ubaidilla Dahlan', 'ubaidillahdahlan@gmail.com', 'opet', '$2y$10$dBpPdnA5qQ57X.o3uiJgyOuvru23KgmS/oPuT7kV3qvMSHeReLe6G'),
+(4, 'Amelia Nur Aini', 'amel@gmail.com', 'saleh', '$2y$10$j7lhjtdxkBK69ZyW0VRBBeDZ.q5wObDHnqHEFZwF5K0Xhg7aFbJUq'),
+(5, 'Aira Diandra', 'aira@gmail.com', 'weci', '$2y$10$FPjTJAePCDIzC4oQ1DbSk.aA3Kw7uGy9VgZGrfLDXMCxae1G19Oi2'),
+(6, 'M Ferdian Renaldi', 'ferdian@gmail.com', 'joran', '$2y$10$p9RGUkoujLBE.Pdp86skZeQMXp/fGPn39z28oqF/SW.S.BfRiN27K');
 
 -- --------------------------------------------------------
 
@@ -70,10 +72,12 @@ CREATE TABLE `data_barang` (
 INSERT INTO `data_barang` (`id_barang`, `id_lab`, `kode_barang`, `nama_barang`, `kategori`, `stok`, `kondisi`, `status`, `keterangan`, `created_at`, `updated_at`) VALUES
 (1, 2, 'BRG0001', 'Switch', 'Jaringan', 10, 'baik', 'availabel', '', '2026-07-17 11:24:48', '2026-07-17 11:24:48'),
 (2, 5, 'BRG0002', 'Oculus', 'Game dan Multimedia', 1, 'baik', 'availabel', '', '2026-07-17 11:26:38', '2026-07-17 11:26:38'),
-(3, 5, 'BRG0003', 'Meta Quest', 'Game dan Multimedia', 1, 'baik', 'availabel', '', '2026-07-17 11:26:58', '2026-07-17 11:26:58'),
+(3, 5, 'BRG0003', 'Meta Quest', 'Game dan Multimedia', 1, 'baik', 'availabel', '', '2026-07-17 11:26:58', '2026-07-18 05:49:09'),
 (4, 2, 'BRG0004', 'Mouse', 'Paripheral', 8, 'baik', 'availabel', '', '2026-07-17 11:52:35', '2026-07-17 11:52:35'),
 (5, 2, 'BRG0005', 'Keyboard', 'Paripheral', 7, 'baik', 'availabel', '', '2026-07-17 11:53:04', '2026-07-17 11:53:04'),
-(6, 2, 'BRG0006', 'Monitor', 'Multimedia', 5, 'baik', 'availabel', '', '2026-07-17 11:53:40', '2026-07-17 11:53:40');
+(6, 2, 'BRG0006', 'Monitor', 'Multimedia', 5, 'baik', 'availabel', '', '2026-07-17 11:53:40', '2026-07-17 11:53:40'),
+(7, 2, 'BRG0007', 'Kabel HDMI', 'Paripheral', 25, 'baik', 'availabel', '', '2026-07-18 06:08:06', '2026-07-20 06:53:49'),
+(8, 2, 'BRG0008', 'USB Video Capture', 'Multimedia', 3, 'baik', 'availabel', '', '2026-07-18 06:08:59', '2026-07-18 06:08:59');
 
 -- --------------------------------------------------------
 
@@ -100,7 +104,7 @@ INSERT INTO `data_lab` (`id_lab`, `nama_lab`, `lokasi`, `stok`, `jumlah_kursi`, 
 (2, 'Sistem Komputer', 'Gedung Lab Lantai 2', 40, 40, 40, 'availabel'),
 (3, 'Sistem Cerdas', 'Gedung Lab Lantai 3', 40, 40, 40, 'availabel'),
 (4, 'Komputasi', 'Gedung Lab Lantai 3', 40, 40, 40, 'availabel'),
-(5, 'Game dan Multimedia', 'Gedung Lab Lantai 2', 41, 40, 40, 'availabel'),
+(5, 'Game dan Multimedia', 'Gedung Lab Lantai 2', 39, 40, 40, 'availabel'),
 (6, 'RPL', 'Gedung Lab Lantai 3', 40, 40, 40, 'availabel'),
 (7, 'Ruang Baca (RBC)', 'Gedung Lab Lantai 2', 40, 40, 40, 'availabel');
 
@@ -113,10 +117,14 @@ INSERT INTO `data_lab` (`id_lab`, `nama_lab`, `lokasi`, `stok`, `jumlah_kursi`, 
 CREATE TABLE `data_pinjam` (
   `id_data` int NOT NULL,
   `nim` char(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `jenis` enum('lab','barang') NOT NULL DEFAULT 'lab',
   `tanggal` date NOT NULL,
   `jam_mulai` time NOT NULL,
   `jam_selesai` time NOT NULL,
-  `nama_lab` varchar(100) NOT NULL,
+  `nama_lab` varchar(100) DEFAULT NULL,
+  `id_barang` int DEFAULT NULL,
+  `nama_barang` varchar(100) DEFAULT NULL,
+  `jumlah` int DEFAULT NULL,
   `kursi` int DEFAULT NULL,
   `status` enum('disetujui','ditolak','menunggu','selesai') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -125,25 +133,8 @@ CREATE TABLE `data_pinjam` (
 -- Dumping data for table `data_pinjam`
 --
 
-INSERT INTO `data_pinjam` (`id_data`, `nim`, `tanggal`, `jam_mulai`, `jam_selesai`, `nama_lab`, `kursi`, `status`) VALUES
-(4, '251080200146', '2026-02-05', '11:00:00', '13:00:00', 'Game dan Multimedia', NULL, 'selesai'),
-(5, '251080200146', '2026-02-05', '13:00:00', '15:00:00', 'Komputasi', NULL, 'ditolak'),
-(6, '251080200113', '2026-02-05', '12:17:00', '14:00:00', 'RPL', NULL, 'selesai'),
-(7, '251080200146', '2026-02-08', '14:00:00', '15:00:00', 'Komputasi', NULL, 'selesai'),
-(8, '251080200146', '2026-02-08', '12:00:00', '14:35:00', 'RPL', NULL, 'selesai'),
-(9, '251080200146', '2026-02-10', '15:01:00', '16:01:00', 'Komputasi', NULL, 'selesai'),
-(10, '251080200146', '2026-02-12', '20:00:00', '21:00:00', 'Game dan Multimedia', NULL, 'selesai'),
-(11, '251080200146', '2026-02-12', '21:03:00', '22:03:00', 'Game dan Multimedia', NULL, 'selesai'),
-(12, '251080200146', '2026-02-12', '20:10:00', '21:10:00', 'Algoritma dan Pemrograman', NULL, 'selesai'),
-(13, '251080200146', '2026-02-12', '21:12:00', '22:12:00', 'Komputasi', NULL, 'selesai'),
-(14, '251080200146', '2026-02-12', '20:21:00', '21:21:00', 'Sistem Komputer', NULL, 'selesai'),
-(15, '251080200146', '2026-07-16', '15:03:00', '16:03:00', 'Game dan Multimedia', 1, 'selesai'),
-(16, '251080200146', '2026-07-16', '15:05:00', '16:05:00', 'Game dan Multimedia', 2, 'selesai'),
-(17, '251080200146', '2026-07-16', '18:13:00', '20:14:00', 'Game dan Multimedia', 11, 'selesai'),
-(18, '251080200146', '2026-07-17', '13:13:00', '14:13:00', 'Algoritma Pemrograman', 1, 'selesai'),
-(19, '251080200146', '2026-07-17', '13:19:00', '14:19:00', 'Game dan Multimedia', 1, 'selesai'),
-(20, '251080200146', '2026-07-17', '15:24:00', '17:24:00', 'Algoritma Pemrograman', 1, 'disetujui'),
-(21, '251080200146', '2026-07-17', '17:36:00', '19:36:00', 'Game dan Multimedia', 1, 'disetujui');
+INSERT INTO `data_pinjam` (`id_data`, `nim`, `jenis`, `tanggal`, `jam_mulai`, `jam_selesai`, `nama_lab`, `id_barang`, `nama_barang`, `jumlah`, `kursi`, `status`) VALUES
+(25, '251080200146', 'lab', '2026-07-21', '10:51:00', '11:51:00', 'Game dan Multimedia', NULL, NULL, NULL, 1, 'menunggu');
 
 -- --------------------------------------------------------
 
@@ -229,7 +220,7 @@ INSERT INTO `inventaris_meja` (`id_meja`, `id_lab`, `nomor_meja`, `cpu_kondisi`,
 (38, 5, 38, 'normal', 'normal', 'normal', 'normal', 'normal'),
 (39, 5, 39, 'normal', 'normal', 'normal', 'normal', 'normal'),
 (40, 5, 40, 'normal', 'normal', 'normal', 'normal', 'normal'),
-(41, 1, 1, 'instal_ulang', 'normal', 'normal', 'tidak_ada', 'normal'),
+(41, 1, 1, 'normal', 'normal', 'normal', 'normal', 'normal'),
 (42, 1, 2, 'normal', 'normal', 'normal', 'normal', 'normal'),
 (43, 1, 3, 'normal', 'normal', 'tidak_ada', 'normal', 'normal'),
 (44, 1, 4, 'normal', 'normal', 'normal', 'normal', 'normal'),
@@ -289,11 +280,7 @@ CREATE TABLE `mahasiswa` (
 --
 
 INSERT INTO `mahasiswa` (`nama`, `nim`, `no_telepon`, `alamat`, `password`) VALUES
-('MOHAMMAD FERDIAN RENALDY ', '251080200113', '083112255638', 'DS PENATARSEWU RT 3 RW 1', 'tahubulat'),
-('ubaidillah dahlan', '251080200146', '085163024682', 'Dsn Terik, Ds Terik, Kec Krian, Kab Sidoarjo Rt 7 Rw 3', 'ubed123'),
-('Agung Surya Rangga Daniswara', '251080200165', '083452763456', 'Sidoarjo Kota', 'agung123'),
-('Aira Diandra', '251080200287', '0983648653978', 'Sidoarjo', 'aira123'),
-('Adrian Syahputra', '251080200349', '097364286424', 'Sidoarjo', 'adrian123');
+('M Ubaidillah Dahlan', '251080200146', '085163024682', 'Dsn Terik, Ds Terik, Kec Krian, Kab Sidoarjo Rt 7 Rw 3', '$2y$10$Dy/xTL/njn0Sar0hrAqVIe1l90nTrGdutiMCJANrTw.UBptzZHS9O');
 
 -- --------------------------------------------------------
 
@@ -436,7 +423,8 @@ ALTER TABLE `data_lab`
 -- Indexes for table `data_pinjam`
 --
 ALTER TABLE `data_pinjam`
-  ADD PRIMARY KEY (`id_data`);
+  ADD PRIMARY KEY (`id_data`),
+  ADD KEY `fk_pinjam_barang` (`id_barang`);
 
 --
 -- Indexes for table `inventaris_ac`
@@ -487,13 +475,13 @@ ALTER TABLE `riwayat_meja`
 -- AUTO_INCREMENT for table `admin`
 --
 ALTER TABLE `admin`
-  MODIFY `id_admin` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id_admin` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `data_barang`
 --
 ALTER TABLE `data_barang`
-  MODIFY `id_barang` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id_barang` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `data_lab`
@@ -505,7 +493,7 @@ ALTER TABLE `data_lab`
 -- AUTO_INCREMENT for table `data_pinjam`
 --
 ALTER TABLE `data_pinjam`
-  MODIFY `id_data` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `id_data` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `inventaris_ac`
@@ -546,6 +534,12 @@ ALTER TABLE `riwayat_meja`
 --
 ALTER TABLE `data_barang`
   ADD CONSTRAINT `fk_barang_lab` FOREIGN KEY (`id_lab`) REFERENCES `data_lab` (`id_lab`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `data_pinjam`
+--
+ALTER TABLE `data_pinjam`
+  ADD CONSTRAINT `fk_pinjam_barang` FOREIGN KEY (`id_barang`) REFERENCES `data_barang` (`id_barang`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `inventaris_ac`
