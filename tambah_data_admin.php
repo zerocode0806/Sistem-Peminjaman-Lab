@@ -239,7 +239,7 @@ input:focus {
         </div>
         <?php endif; ?>
 
-        <form method="POST" action="tambah_admin.php">
+        <form method="POST" action="tambah_data_admin.php">
 
             <div class="field-group">
                 <label for="nama">Nama</label>

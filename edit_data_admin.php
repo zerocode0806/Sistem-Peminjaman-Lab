@@ -286,7 +286,7 @@ input:focus {
         </div>
         <?php endif; ?>
 
-        <form method="POST" action="edit_admin.php?id=<?= (int)$id ?>">
+        <form method="POST" action="edit_data_admin.php?id=<?= (int)$id ?>">
 
             <div class="field-group">
                 <label for="nama">Nama</label>
