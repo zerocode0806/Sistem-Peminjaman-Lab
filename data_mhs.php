@@ -647,11 +647,11 @@ tbody td:last-child { text-align: right; }
                                     <i class="bi bi-arrow-right"></i>
                                     <span>Detail</span>
                                 </a>
-                                <a href="edit_data_mhs.php?id=<?= $row['nim'] ?>" class="btn-action btn-edit">
+                                <a href="edit_data_mhs.php?nim=<?= $row['nim'] ?>" class="btn-action btn-edit">
                                     <i class="bi bi-pencil"></i>
                                     <span>Ubah</span>
                                 </a>
-                                <a href="hapus_data_mhs.php?id=<?= $row['nim'] ?>"
+                                <a href="hapus_data_mhs.php?nim=<?= $row['nim'] ?>"
                                    class="btn-action btn-delete"
                                    onclick="return confirm('Yakin ingin menghapus mahasiswa ini?')">
                                     <i class="bi bi-trash"></i>

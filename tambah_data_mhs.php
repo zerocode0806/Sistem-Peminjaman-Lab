@@ -16,31 +16,41 @@ if (isset($_POST['simpan'])) {
     $alamat     = mysqli_real_escape_string($koneksi, trim($_POST['alamat']));
     $password   = trim($_POST['password'] ?? '');
 
+    // Validasi input
     if ($nama === '' || $nim === '' || $no_telepon === '' || $alamat === '') {
         $error = "Lengkapi semua data mahasiswa.";
     } else {
 
-        // 🔎 Cek duplikat NIM
+        // Cek apakah NIM sudah ada
         $cek = mysqli_query($koneksi, "SELECT nim FROM mahasiswa WHERE nim = '$nim'");
 
         if (mysqli_num_rows($cek) > 0) {
             $error = "NIM sudah terdaftar.";
         } else {
 
-            // Password default = NIM jika dikosongkan
-            $passwordFinal = $password !== '' ? $password : $nim;
-            $passwordEsc   = mysqli_real_escape_string($koneksi, $passwordFinal);
+            // Jika password kosong, gunakan NIM sebagai password default
+            $passwordFinal = ($password !== '') ? $password : $nim;
 
+            // Hash password
+            $passwordHash = password_hash($passwordFinal, PASSWORD_DEFAULT);
+
+            // Simpan ke database
             $insert = mysqli_query($koneksi, "
                 INSERT INTO mahasiswa (nama, nim, no_telepon, alamat, password)
-                VALUES ('$nama', '$nim', '$no_telepon', '$alamat', '$passwordEsc')
+                VALUES (
+                    '$nama',
+                    '$nim',
+                    '$no_telepon',
+                    '$alamat',
+                    '$passwordHash'
+                )
             ");
 
-            if (!$insert) {
-                $error = "Gagal menyimpan data mahasiswa.";
-            } else {
+            if ($insert) {
                 header("Location: data_mhs.php?msg=added");
                 exit;
+            } else {
+                $error = "Gagal menyimpan data mahasiswa: " . mysqli_error($koneksi);
             }
         }
     }

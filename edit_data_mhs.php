@@ -7,7 +7,8 @@ if (!isset($_SESSION['user'])) {
     exit;
 }
 
-$nim = isset($_GET['id']) ? mysqli_real_escape_string($koneksi, $_GET['id']) : '';
+$nim = isset($_GET['nim']) ? mysqli_real_escape_string($koneksi, $_GET['nim']) : '';
+
 if ($nim === '') {
     header('Location: data_mhs.php');
     exit;
@@ -29,39 +30,52 @@ if (isset($_POST['simpan'])) {
     $alamat     = mysqli_real_escape_string($koneksi, trim($_POST['alamat']));
     $password   = trim($_POST['password'] ?? '');
 
+    // Validasi
     if ($nama === '' || $no_telepon === '' || $alamat === '') {
         $error = "Lengkapi semua data mahasiswa.";
     } else {
 
         if ($password !== '') {
-            $passwordEsc = mysqli_real_escape_string($koneksi, $password);
+
+            // Hash password baru
+            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+
             $update = mysqli_query($koneksi, "
                 UPDATE mahasiswa
-                SET nama = '$nama', no_telepon = '$no_telepon', alamat = '$alamat', password = '$passwordEsc'
+                SET
+                    nama = '$nama',
+                    no_telepon = '$no_telepon',
+                    alamat = '$alamat',
+                    password = '$passwordHash'
                 WHERE nim = '$nim'
             ");
+
         } else {
+
+            // Tidak mengubah password
             $update = mysqli_query($koneksi, "
                 UPDATE mahasiswa
-                SET nama = '$nama', no_telepon = '$no_telepon', alamat = '$alamat'
+                SET
+                    nama = '$nama',
+                    no_telepon = '$no_telepon',
+                    alamat = '$alamat'
                 WHERE nim = '$nim'
             ");
         }
 
-        if (!$update) {
-            $error = "Gagal memperbarui data mahasiswa.";
-        } else {
+        if ($update) {
             header("Location: data_mhs.php?msg=updated");
             exit;
+        } else {
+            $error = "Gagal memperbarui data mahasiswa: " . mysqli_error($koneksi);
         }
     }
 
-    // Supaya form tetap menampilkan input terbaru jika gagal
+    // Agar form tetap menampilkan data terbaru jika gagal
     $mhs['nama']       = $_POST['nama'];
     $mhs['no_telepon'] = $_POST['no_telepon'];
     $mhs['alamat']     = $_POST['alamat'];
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="id">
