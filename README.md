@@ -1,4 +1,4 @@
-# Sistem Peminjaman Lab
+# Sistem Manajemen Lab
 
 Sistem reservasi laboratorium untuk Program Studi Informatika — mahasiswa dapat mengajukan peminjaman ruang lab (lengkap dengan pemilihan kursi) maupun peminjaman barang/alat inventaris lab, sementara admin mengelola data lab, inventaris, mahasiswa, akun admin, dan proses persetujuan peminjaman dari awal sampai pengembalian.
 
