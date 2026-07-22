@@ -557,7 +557,7 @@ body {
             <i class="bi bi-chevron-right"></i>
             <span class="current">Checkout #<?= $id ?></span>
         </nav>
-        <a href="riwayat_pinjam.php" class="btn-back">
+        <a href="arsip_peminjaman.php" class="btn-back">
             <i class="bi bi-arrow-left"></i> Kembali
         </a>
     </div>
